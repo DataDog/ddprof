@@ -72,9 +72,11 @@ bool RuntimeSymbolLookup::insert_or_replace(
         SymbolSpan(address + code_size - 1, symbol_table.size()));
     symbol_table.emplace_back(make_symbol(std::string(symbol), 0, "jit", dict));
   } else {
-    // todo managing range erase (we can overall with other syms)
+    // todo managing range erase (we can overlap with other syms)
     SymbolIdx_t const existing = find_res.first->second.get_symbol_idx();
     ddog_prof_StringId2 name_id = intern_string(dict, symbol);
+    // ProfilesDictionary canonicalizes strings within a dictionary, so handle
+    // comparison avoids materializing strings on this hot path.
     if (symbol_table[existing]._function_id &&
         symbol_table[existing]._function_id->name == name_id) {
       find_res.first->second.set_end(address + code_size - 1);

@@ -5,6 +5,7 @@
 
 #include <gtest/gtest.h>
 
+#include "ddog_profiling_utils.hpp"
 #include "loghandle.hpp"
 #include "runtime_symbol_lookup.hpp"
 #include "symbol_hdr.hpp"
@@ -31,6 +32,18 @@ std::string dict_string(const ddog_prof_ProfilesDictionary *dict,
   return std::string(slice.ptr, slice.len);
 }
 } // namespace
+
+TEST(runtime_symbol_lookup, dictionary_reuses_string_ids) {
+  SymbolHdr symbol_hdr;
+  const ddog_prof_ProfilesDictionary *dict =
+      symbol_hdr.profiles_dictionary();
+
+  ddog_prof_StringId2 first = intern_string(dict, "jit-symbol");
+  ddog_prof_StringId2 second = intern_string(dict, "jit-symbol");
+
+  EXPECT_EQ(first, second);
+  EXPECT_EQ(dict_string(dict, first), "jit-symbol");
+}
 
 TEST(runtime_symbol_lookup, no_map) {
   SymbolHdr symbol_hdr;
