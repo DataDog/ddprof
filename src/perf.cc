@@ -230,7 +230,7 @@ uint64_t perf_value_from_sample(const PerfWatcher *watcher,
     if (PERF_SAMPLE_RAW & watcher->sample_type) {
       uint64_t const raw_offset = watcher->raw_off;
       uint64_t const raw_sz = watcher->raw_sz;
-      if (raw_sz + raw_offset <= sample->size_raw) {
+      if (raw_sz + raw_offset > sample->size_raw) {
         assert(0 && "Overflow in raw event access");
         LG_WRN("Overflow in raw event access");
         return 0;
