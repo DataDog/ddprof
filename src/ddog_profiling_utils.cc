@@ -30,7 +30,7 @@ std::string_view get_or_insert_demangled_sym(
 
 ddog_prof_StringId2 intern_string(const ddog_prof_ProfilesDictionary *dict,
                                   std::string_view str) {
-  if (!dict || str.empty()) {
+  if (str.empty()) {
     return DDOG_PROF_STRINGID2_EMPTY;
   }
   ddog_prof_StringId2 string_id = nullptr;
@@ -46,7 +46,7 @@ ddog_prof_StringId2 intern_string(const ddog_prof_ProfilesDictionary *dict,
 
 std::string_view get_string(const ddog_prof_ProfilesDictionary *dict,
                             ddog_prof_StringId2 string_id) {
-  if (!dict || !string_id) {
+  if (!string_id) {
     return {};
   }
   ddog_CharSlice result{nullptr, 0};
@@ -84,9 +84,6 @@ ddog_prof_FunctionId2
 intern_function_ids(const ddog_prof_ProfilesDictionary *dict,
                     ddog_prof_StringId2 name_id, ddog_prof_StringId2 file_id,
                     ddog_prof_StringId2 system_name_id) {
-  if (!dict) {
-    return nullptr;
-  }
   const ddog_prof_Function2 function = {
       .name = name_id,
       .system_name = system_name_id,
@@ -118,9 +115,6 @@ ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
                                     ElfAddress_t high_addr, Offset_t offset,
                                     std::string_view sopath,
                                     std::string_view build_id) {
-  if (!dict) {
-    return nullptr;
-  }
   const ddog_prof_Mapping2 mapping = {
       .memory_start = low_addr,
       .memory_limit = high_addr,
@@ -159,11 +153,10 @@ DDRes write_location2_no_sym(ElfAddress_t ip, ddog_prof_MappingId2 mapping_id,
                              const ddog_prof_ProfilesDictionary *dict,
                              ddog_prof_Location2 *ffi_location) {
   ffi_location->mapping = mapping_id;
-  const auto sopath = (mapping_id && dict)
-      ? get_string(dict, mapping_id->filename)
-      : std::string_view{};
+  const auto sopath =
+      mapping_id ? get_string(dict, mapping_id->filename) : std::string_view{};
   ffi_location->function = intern_function(dict, {}, sopath);
-  if (dict && !ffi_location->function) {
+  if (!ffi_location->function) {
     DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                            "OOM interning no-sym function for %.*s",
                            static_cast<int>(sopath.size()), sopath.data());
@@ -182,9 +175,8 @@ DDRes write_location2_blaze(
   if (cur_loc >= locations_buff.size()) {
     return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
   }
-  const auto sopath = (mapping_id && dict)
-      ? get_string(dict, mapping_id->filename)
-      : std::string_view{};
+  const auto sopath =
+      mapping_id ? get_string(dict, mapping_id->filename) : std::string_view{};
   constexpr std::string_view undef{};
   constexpr std::string_view undef_inlined = undef;
   for (int i = blaze_sym.inlined_cnt - 1; i >= 0 && cur_loc < kMaxStackDepth;
@@ -199,7 +191,7 @@ DDRes write_location2_blaze(
         : sopath;
     ffi_location.mapping = mapping_id;
     ffi_location.function = intern_function(dict, demangled_name, file_name);
-    if (dict && !ffi_location.function) {
+    if (!ffi_location.function) {
       DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                              "OOM interning inlined function");
     }
