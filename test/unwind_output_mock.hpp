@@ -5,16 +5,13 @@
 
 #pragma once
 
+#include "ddog_profiling_utils.hpp"
 #include "mapinfo_table.hpp"
 #include "symbol_table.hpp"
 #include "unwind_output.hpp"
 
 namespace ddprof {
 #define K_MOCK_LOC_SIZE 11
-static const char *s_syn_names[K_MOCK_LOC_SIZE] = {
-    "xd_foo0", "xd_foo1", "xd_foo2", "xd_foo3", "xd_foo4", "xd_foo5",
-    "xd_foo6", "xd_foo7", "xd_foo8", "xd_foo9", "xd_foo10"};
-
 static const char *s_func_names[K_MOCK_LOC_SIZE] = {
     "foo0", "foo1", "foo2", "foo3", "foo4", "foo5",
     "foo6", "foo7", "foo8", "foo9", "foo10"};
@@ -25,18 +22,21 @@ static const char *s_src_paths[K_MOCK_LOC_SIZE] = {
 
 static const char *s_so_paths[] = {"bar.0.so"};
 
-static inline void fill_symbol_table_1(SymbolTable &symbol_table) {
+static inline void
+fill_symbol_table_1(SymbolTable &symbol_table,
+                    const ddog_prof_ProfilesDictionary *dict) {
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
-    symbol_table.emplace_back(std::string(s_syn_names[i]),
-                              std::string(s_func_names[i]), 10 * i,
-                              std::string(s_src_paths[i]));
+    symbol_table.emplace_back(make_symbol(std::string(s_func_names[i]), 10 * i,
+                                          std::string(s_src_paths[i]), dict));
   }
 }
 
-static inline void fill_mapinfo_table_1(MapInfoTable &mapinfo_table) {
+static inline void
+fill_mapinfo_table_1(MapInfoTable &mapinfo_table,
+                     const ddog_prof_ProfilesDictionary *dict) {
   for (unsigned i = 0; i < K_MOCK_LOC_SIZE; ++i) {
-    mapinfo_table.emplace_back(100 + i, 200 + i, 10 + i,
-                               std::string{s_so_paths[0]}, BuildIdStr{});
+    mapinfo_table.push_back(
+        intern_mapping(dict, 100U + i, 200U + i, 10U + i, s_so_paths[0], {}));
   }
 }
 
@@ -52,11 +52,12 @@ static inline void fill_unwind_output_1(UnwindOutput &uw_output) {
   }
 }
 
-static inline void fill_unwind_symbols(SymbolTable &symbol_table,
-                                       MapInfoTable &mapinfo_table,
-                                       UnwindOutput &uw_output) {
-  fill_symbol_table_1(symbol_table);
-  fill_mapinfo_table_1(mapinfo_table);
+static inline void
+fill_unwind_symbols(SymbolTable &symbol_table, MapInfoTable &mapinfo_table,
+                    UnwindOutput &uw_output,
+                    const ddog_prof_ProfilesDictionary *dict) {
+  fill_symbol_table_1(symbol_table, dict);
+  fill_mapinfo_table_1(mapinfo_table, dict);
   fill_unwind_output_1(uw_output);
 }
 

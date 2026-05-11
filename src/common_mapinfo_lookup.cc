@@ -5,31 +5,21 @@
 
 #include "common_mapinfo_lookup.hpp"
 
+#include "ddog_profiling_utils.hpp"
+
 namespace ddprof {
-namespace {
-MapInfo mapinfo_from_common(CommonMapInfoLookup::MappingErrors lookup_case) {
-  switch (lookup_case) {
-  case CommonMapInfoLookup::MappingErrors::empty:
-    return {};
-  default:
-    break;
-  }
-  return {};
-}
-} // namespace
 
 MapInfoIdx_t CommonMapInfoLookup::get_or_insert(
-    CommonMapInfoLookup::MappingErrors lookup_case,
-    MapInfoTable &mapinfo_table) {
+    CommonMapInfoLookup::MappingErrors lookup_case, MapInfoTable &mapinfo_table,
+    const ddog_prof_ProfilesDictionary *dict) {
   auto const it = _map.find(lookup_case);
-  MapInfoIdx_t res;
   if (it != _map.end()) {
-    res = it->second;
-  } else { // insert things
-    res = mapinfo_table.size();
-    mapinfo_table.push_back(mapinfo_from_common(lookup_case));
-    _map.insert({lookup_case, res});
+    return it->second;
   }
+  const MapInfoIdx_t res = mapinfo_table.size();
+  // Empty mapping: all-zero addresses and empty strings.
+  mapinfo_table.push_back(intern_mapping(dict, 0, 0, 0, {}, {}));
+  _map.insert({lookup_case, res});
   return res;
 }
 

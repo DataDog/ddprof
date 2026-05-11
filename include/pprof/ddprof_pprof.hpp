@@ -22,12 +22,25 @@ class Symbolizer;
 struct SymbolHdr;
 
 struct DDProfPProf {
+  // Label key IDs are stored in the dictionary (process-scoped)
+  // They are initialized once when SymbolHdr is created
+  struct DictLabelKeyIds {
+    ddog_prof_StringId2 container_id{};
+    ddog_prof_StringId2 process_id{};
+    ddog_prof_StringId2 process_name{};
+    ddog_prof_StringId2 thread_id{};
+    ddog_prof_StringId2 thread_name{};
+    ddog_prof_StringId2 tracepoint_type{};
+  };
+
   /* single profile gathering several value types */
   ddog_prof_Profile _profile{};
   unsigned _nb_values = 0;
   Tags _tags;
   // avoid re-creating strings for all pid numbers
   std::unordered_map<pid_t, std::string> _pid_str;
+  // Dictionary label key IDs (set from SymbolHdr)
+  DictLabelKeyIds _dict_label_key_ids;
 };
 
 struct DDProfValuePack {
@@ -36,7 +49,8 @@ struct DDProfValuePack {
   uint64_t timestamp;
 };
 
-DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
+DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx,
+                           const ddog_prof_ProfilesDictionaryHandle *dict);
 
 /**
  * Aggregate to the existing profile the provided unwinding output.
@@ -45,12 +59,12 @@ DDRes pprof_create_profile(DDProfPProf *pprof, DDProfContext &ctx);
  * @param watcher_idx matches the registered order at profile creation
  * @param pprof
  */
-DDRes pprof_aggregate(const UnwindOutput *uw_output,
-                      const SymbolHdr &symbol_hdr, const DDProfValuePack &pack,
-                      const PerfWatcher *watcher,
-                      const FileInfoVector &file_infos, bool show_samples,
-                      EventAggregationModePos value_pos, Symbolizer *symbolizer,
-                      DDProfPProf *pprof);
+DDRes pprof_aggregate_interned_sample(
+    const UnwindOutput *uw_output, const SymbolHdr &symbol_hdr,
+    const DDProfValuePack &pack, const PerfWatcher *watcher,
+    const FileInfoVector &file_infos, bool show_samples,
+    EventAggregationModePos value_pos, Symbolizer *symbolizer,
+    DDProfPProf *pprof);
 
 DDRes pprof_reset(DDProfPProf *pprof);
 

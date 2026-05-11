@@ -25,10 +25,13 @@ TEST(DDProfPProf, init_profiles) {
   DDProfPProf pprof;
   DDProfContext ctx = {};
   ctx.watchers.push_back(*ewatcher_from_str("sCPU"));
-  DDRes res = pprof_create_profile(&pprof, ctx);
+  ddog_prof_ProfilesDictionaryHandle dict;
+  ddog_prof_ProfilesDictionary_new(&dict);
+  DDRes res = pprof_create_profile(&pprof, ctx, &dict);
   EXPECT_TRUE(IsDDResOK(res));
   res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
+  ddog_prof_ProfilesDictionary_drop(&dict);
 }
 
 void test_pprof(DDProfPProf *pprofs) {
@@ -59,18 +62,20 @@ TEST(DDProfPProf, aggregate) {
   SymbolTable &table = symbol_hdr._symbol_table;
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
   FileInfoVector file_infos;
-  fill_unwind_symbols(table, mapinfo_table, mock_output);
+  fill_unwind_symbols(table, mapinfo_table, mock_output,
+                      symbol_hdr.profiles_dictionary());
   DDProfPProf pprof;
   DDProfContext ctx = {};
 
   bool ok = watchers_from_str("sCPU", ctx.watchers);
   EXPECT_TRUE(ok);
-  DDRes res = pprof_create_profile(&pprof, ctx);
+  DDRes res =
+      pprof_create_profile(&pprof, ctx, symbol_hdr._profiles_dictionary.get());
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index != -1);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index != -1);
-  res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                        &ctx.watchers[0], file_infos, false, kSumPos,
-                        ctx.worker_ctx.symbolizer, &pprof);
+  res = pprof_aggregate_interned_sample(
+      &mock_output, symbol_hdr, {1000, 1, 0}, &ctx.watchers[0], file_infos,
+      false, kSumPos, ctx.worker_ctx.symbolizer, &pprof);
 
   EXPECT_TRUE(IsDDResOK(res));
 
@@ -87,7 +92,8 @@ TEST(DDProfPProf, just_live) {
   SymbolTable &table = symbol_hdr._symbol_table;
   MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
 
-  fill_unwind_symbols(table, mapinfo_table, mock_output);
+  fill_unwind_symbols(table, mapinfo_table, mock_output,
+                      symbol_hdr.profiles_dictionary());
   DDProfPProf pprof;
   DDProfContext ctx = {};
   {
@@ -101,7 +107,8 @@ TEST(DDProfPProf, just_live) {
   log_watcher(&(ctx.watchers[0]), 0);
   log_watcher(&(ctx.watchers[1]), 1);
 
-  DDRes res = pprof_create_profile(&pprof, ctx);
+  DDRes res =
+      pprof_create_profile(&pprof, ctx, symbol_hdr._profiles_dictionary.get());
   EXPECT_TRUE(IsDDResOK(res));
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_index == -1);
   EXPECT_TRUE(ctx.watchers[0].pprof_indices[kSumPos].pprof_count_index == -1);
@@ -110,11 +117,54 @@ TEST(DDProfPProf, just_live) {
   EXPECT_TRUE(ctx.watchers[1].pprof_indices[kLiveSumPos].pprof_count_index !=
               -1);
   FileInfoVector file_infos;
-  res = pprof_aggregate(&mock_output, symbol_hdr, {1000, 1, 0},
-                        &ctx.watchers[1], file_infos, false, kLiveSumPos,
-                        ctx.worker_ctx.symbolizer, &pprof);
+  res = pprof_aggregate_interned_sample(
+      &mock_output, symbol_hdr, {1000, 1, 0}, &ctx.watchers[1], file_infos,
+      false, kLiveSumPos, ctx.worker_ctx.symbolizer, &pprof);
   EXPECT_TRUE(IsDDResOK(res));
   test_pprof(&pprof);
+  res = pprof_free_profile(&pprof);
+  EXPECT_TRUE(IsDDResOK(res));
+}
+
+// Exercises the profile-export cycle: aggregate, reset, aggregate again,
+// serialize. The interned IDs (StringId2/FunctionId2/MappingId2) are stored
+// in the SymbolHdr-owned ProfilesDictionary and must remain valid across
+// pprof_reset so the second round of samples serializes correctly.
+TEST(DDProfPProf, aggregate_reset_aggregate) {
+  LogHandle handle;
+  SymbolHdr symbol_hdr;
+  UnwindOutput mock_output;
+  SymbolTable &table = symbol_hdr._symbol_table;
+  MapInfoTable &mapinfo_table = symbol_hdr._mapinfo_table;
+  FileInfoVector file_infos;
+  fill_unwind_symbols(table, mapinfo_table, mock_output,
+                      symbol_hdr.profiles_dictionary());
+  DDProfPProf pprof;
+  DDProfContext ctx = {};
+
+  ASSERT_TRUE(watchers_from_str("sCPU", ctx.watchers));
+  DDRes res =
+      pprof_create_profile(&pprof, ctx, symbol_hdr._profiles_dictionary.get());
+  ASSERT_TRUE(IsDDResOK(res));
+
+  // First cycle
+  res = pprof_aggregate_interned_sample(
+      &mock_output, symbol_hdr, {1000, 1, 0}, &ctx.watchers[0], file_infos,
+      false, kSumPos, ctx.worker_ctx.symbolizer, &pprof);
+  EXPECT_TRUE(IsDDResOK(res));
+  test_pprof(&pprof);
+
+  // Reset the profile: ids in the dictionary must remain valid.
+  res = pprof_reset(&pprof);
+  ASSERT_TRUE(IsDDResOK(res));
+
+  // Second cycle on the same dictionary / watcher
+  res = pprof_aggregate_interned_sample(
+      &mock_output, symbol_hdr, {2000, 3, 42}, &ctx.watchers[0], file_infos,
+      false, kSumPos, ctx.worker_ctx.symbolizer, &pprof);
+  EXPECT_TRUE(IsDDResOK(res));
+  test_pprof(&pprof);
+
   res = pprof_free_profile(&pprof);
   EXPECT_TRUE(IsDDResOK(res));
 }

@@ -7,39 +7,69 @@
 
 #include "ddres_def.hpp"
 #include "map_utils.hpp"
-#include "mapinfo_table.hpp"
 #include "symbol.hpp"
 #include "unwind_output.hpp"
 
-#include "datadog/blazesym.h"
 #include "datadog/common.h"
 #include "datadog/profiling.h"
 
+#include <span>
 #include <string_view>
+
+struct blaze_sym;
 
 namespace ddprof {
 inline ddog_CharSlice to_CharSlice(std::string_view str) {
   return {.ptr = str.data(), .len = str.size()};
 }
 
-void write_function(const Symbol &symbol, ddog_prof_Function *ffi_func);
+ddog_prof_StringId2 intern_string(const ddog_prof_ProfilesDictionary *dict,
+                                  std::string_view str);
 
-void write_function(std::string_view demangled_name, std::string_view file_name,
-                    ddog_prof_Function *ffi_func);
+std::string_view get_string(const ddog_prof_ProfilesDictionary *dict,
+                            ddog_prof_StringId2 string_id);
 
-void write_mapping(const MapInfo &mapinfo, ddog_prof_Mapping *ffi_mapping);
+std::string_view
+get_location2_function_name(const ddog_prof_ProfilesDictionary *dict,
+                            const ddog_prof_Location2 &loc);
 
-void write_location(const FunLoc &loc, const MapInfo &mapinfo,
-                    const Symbol &symbol, ddog_prof_Location *ffi_location);
+std::string_view
+get_location2_mapping_filename(const ddog_prof_ProfilesDictionary *dict,
+                               const ddog_prof_Location2 &loc);
 
-void write_location(ProcessAddress_t ip_or_elf_addr,
-                    std::string_view demangled_name, std::string_view file_name,
-                    uint32_t lineno, const MapInfo &mapinfo,
-                    ddog_prof_Location *ffi_location);
+ddog_prof_FunctionId2
+intern_function_ids(const ddog_prof_ProfilesDictionary *dict,
+                    ddog_prof_StringId2 name_id, ddog_prof_StringId2 file_id,
+                    ddog_prof_StringId2 system_name_id);
 
-DDRes write_location_blaze(
+ddog_prof_FunctionId2 intern_function(const ddog_prof_ProfilesDictionary *dict,
+                                      std::string_view demangled_name,
+                                      std::string_view file_name,
+                                      std::string_view system_name = {});
+
+// Intern a mapping given its raw fields. Interns the filename and build_id
+// strings internally before inserting into the dictionary.
+ddog_prof_MappingId2 intern_mapping(const ddog_prof_ProfilesDictionary *dict,
+                                    ElfAddress_t low_addr,
+                                    ElfAddress_t high_addr, Offset_t offset,
+                                    std::string_view sopath,
+                                    std::string_view build_id = {});
+
+Symbol make_symbol(const std::string &demangled_name, uint32_t lineno,
+                   const std::string &srcpath,
+                   const ddog_prof_ProfilesDictionary *dict);
+
+void write_location2(const FunLoc &loc, ddog_prof_MappingId2 mapping_id,
+                     const Symbol &symbol, ddog_prof_Location2 *ffi_location);
+
+DDRes write_location2_blaze(
     ElfAddress_t elf_addr,
     ddprof::HeterogeneousLookupStringMap<std::string> &demangled_names,
-    const MapInfo &mapinfo, const blaze_sym &blaze_sym, unsigned &cur_loc,
-    std::span<ddog_prof_Location> locations_buff);
+    ddog_prof_MappingId2 mapping_id, const blaze_sym &blaze_sym,
+    unsigned &cur_loc, const ddog_prof_ProfilesDictionary *dict,
+    std::span<ddog_prof_Location2> locations_buff);
+
+DDRes write_location2_no_sym(ElfAddress_t ip, ddog_prof_MappingId2 mapping_id,
+                             const ddog_prof_ProfilesDictionary *dict,
+                             ddog_prof_Location2 *ffi_location);
 } // namespace ddprof

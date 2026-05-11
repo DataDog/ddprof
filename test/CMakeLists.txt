@@ -202,6 +202,7 @@ add_unit_test(
   ../src/ddog_profiling_utils.cc
   ../src/ddprof_cmdline_watcher.cc
   ../src/pprof/ddprof_pprof.cc
+  ../src/symbol_hdr.cc
   ../src/symbolizer.cc
   ../src/demangler/demangler.cc
   ../src/perf_watcher.cc
@@ -215,6 +216,7 @@ add_unit_test(
   ../src/exporter/ddprof_exporter.cc
   ../src/pprof/ddprof_pprof.cc
   ../src/perf_watcher.cc
+  ../src/symbol_hdr.cc
   ../src/symbolizer.cc
   ../src/demangler/demangler.cc
   ../src/tags.cc
@@ -272,6 +274,7 @@ add_unit_test(
   ../src/mapinfo_lookup.cc
   ../src/procutils.cc
   ../src/runtime_symbol_lookup.cc
+  ../src/symbol_hdr.cc
   ../src/symbol_map.cc
   ../src/signal_helper.cc
   ../src/statsd.cc
@@ -297,6 +300,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/common_mapinfo_lookup.cc
     ../src/common_symbol_lookup.cc
     ../src/create_elf.cc
+    ../src/ddog_profiling_utils.cc
     ../src/ddprof_process.cc
     ../src/ddprof_stats.cc
     ../src/dso_symbol_lookup.cc
@@ -319,6 +323,7 @@ set(ALLOCATION_TRACKER_UT_SRCS
     ../src/mapinfo_lookup.cc
     ../src/procutils.cc
     ../src/runtime_symbol_lookup.cc
+    ../src/symbol_hdr.cc
     ../src/symbol_map.cc
     ../src/signal_helper.cc
     ../src/statsd.cc
@@ -360,14 +365,32 @@ add_unit_test(timer-ut timer-ut.cc ../src/tsc_clock.cc ../src/perf.cc)
 
 add_unit_test(ddprof_file_info-ut ddprof_file_info-ut.cc)
 
-add_unit_test(runtime_symbol_lookup-ut runtime_symbol_lookup-ut.cc ../src/runtime_symbol_lookup.cc
-              ../src/symbol_map.cc ../src/jit/jitdump.cc)
+add_unit_test(
+  runtime_symbol_lookup-ut
+  runtime_symbol_lookup-ut.cc
+  ../src/runtime_symbol_lookup.cc
+  ../src/ddog_profiling_utils.cc
+  ../src/symbol_hdr.cc
+  ../src/demangler/demangler.cc
+  ../src/symbol_map.cc
+  ../src/jit/jitdump.cc
+  LIBRARIES Datadog::Profiling llvm-demangle)
 
 add_unit_test(ddprof_cpumask-ut ddprof_cpumask-ut.cc ../src/ddprof_cpumask.cc)
 
 add_unit_test(symbol_map-ut symbol_map-ut.cc ../src/symbol_map.cc)
 
 add_unit_test(build_id-ut build_id-ut.cc ../src/build_id.cc)
+
+add_unit_test(
+  mapinfo_lookup-ut
+  mapinfo_lookup-ut.cc
+  ../src/build_id.cc
+  ../src/ddog_profiling_utils.cc
+  ../src/demangler/demangler.cc
+  ../src/dso.cc
+  ../src/mapinfo_lookup.cc
+  LIBRARIES Datadog::Profiling llvm-demangle)
 
 add_unit_test(jitdump-ut jitdump-ut.cc ../src/jit/jitdump.cc)
 
@@ -455,6 +478,20 @@ add_benchmark(
 
 add_benchmark(address_bitset-bench address_bitset-bench.cc ../src/lib/address_bitset.cc
               LIBRARIES absl::flat_hash_map absl::hash)
+
+add_benchmark(
+  pprof_aggregate-bench
+  pprof_aggregate-bench.cc
+  ../src/ddog_profiling_utils.cc
+  ../src/ddprof_cmdline_watcher.cc
+  ../src/pprof/ddprof_pprof.cc
+  ../src/symbol_hdr.cc
+  ../src/symbolizer.cc
+  ../src/demangler/demangler.cc
+  ../src/perf_watcher.cc
+  ../src/tracepoint_config.cc
+  LIBRARIES Datadog::Profiling DDProf::Parser llvm-demangle
+  DEFINITIONS MYNAME="pprof_aggregate-bench")
 
 set(SIMPLE_MALLOC_SRC simple_malloc.cc ../src/signal_helper.cc)
 

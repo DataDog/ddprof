@@ -17,7 +17,9 @@ struct DDProfContext DDProfContext;
 const Symbol &get_symbol(const DDProfContext *ctx,
                          const UnwindOutput *unwind_output, unsigned loc_idx);
 
-const MapInfo &get_mapinfo(const DDProfContext *ctx,
-                           const UnwindOutput *unwind_output, unsigned loc_idx);
+// Returns the interned mapping handle for the given location index.
+ddog_prof_MappingId2 get_mapinfo(const DDProfContext *ctx,
+                                 const UnwindOutput *unwind_output,
+                                 unsigned loc_idx);
 
 } // namespace ddprof

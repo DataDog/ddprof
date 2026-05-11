@@ -15,13 +15,63 @@
 #include "runtime_symbol_lookup.hpp"
 
 #include <cstdlib>
+#include <utility>
+
+// Forward declarations for libdatadog types (must be at global scope)
+struct ddog_prof_ProfilesDictionary;
+using ddog_prof_ProfilesDictionaryHandle = ddog_prof_ProfilesDictionary *;
 
 namespace ddprof {
+
+// RAII wrapper around a libdatadog ProfilesDictionary handle.
+class ProfilesDictionary {
+public:
+  ProfilesDictionary();
+  ~ProfilesDictionary();
+
+  ProfilesDictionary(const ProfilesDictionary &) = delete;
+  ProfilesDictionary &operator=(const ProfilesDictionary &) = delete;
+
+  ProfilesDictionary(ProfilesDictionary &&o) noexcept
+      : _handle(std::exchange(o._handle, nullptr)) {}
+  ProfilesDictionary &operator=(ProfilesDictionary &&o) noexcept {
+    if (this != &o) {
+      reset();
+      _handle = std::exchange(o._handle, nullptr);
+    }
+    return *this;
+  }
+
+  explicit operator bool() const { return _handle != nullptr; }
+
+  [[nodiscard]] const ddog_prof_ProfilesDictionaryHandle *get() const {
+    return &_handle;
+  }
+  [[nodiscard]] const ddog_prof_ProfilesDictionary *dict() const {
+    return _handle;
+  }
+
+private:
+  void reset();
+
+  ddog_prof_ProfilesDictionaryHandle _handle{};
+};
+
 struct SymbolHdr {
-  explicit SymbolHdr(std::string_view path_to_proc = "")
-      : _runtime_symbol_lookup(path_to_proc) {}
+  explicit SymbolHdr(std::string_view path_to_proc = "");
+  ~SymbolHdr() = default;
+
+  SymbolHdr(const SymbolHdr &) = delete;
+  SymbolHdr &operator=(const SymbolHdr &) = delete;
+  SymbolHdr(SymbolHdr &&) noexcept = default;
+  SymbolHdr &operator=(SymbolHdr &&) noexcept = default;
   void display_stats() const { _dso_symbol_lookup.stats_display(); }
   void cycle() { _runtime_symbol_lookup.cycle(); }
+
+  [[nodiscard]] const ddog_prof_ProfilesDictionary *
+  profiles_dictionary() const {
+    return _profiles_dictionary.dict();
+  }
 
   void clear(pid_t pid) {
     _base_frame_symbol_lookup.erase(pid);
@@ -29,6 +79,11 @@ struct SymbolHdr {
     _mapinfo_lookup.erase(pid);
     _runtime_symbol_lookup.erase(pid);
   }
+
+  // String interning dictionary (persists across profile exports).
+  // MUST be declared first so it is destroyed last — Symbol and MapInfoTable
+  // entries hold pointers into this dictionary.
+  ProfilesDictionary _profiles_dictionary;
 
   // Cache symbol associations
   BaseFrameSymbolLookup _base_frame_symbol_lookup;

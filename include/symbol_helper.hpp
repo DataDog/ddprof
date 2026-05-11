@@ -3,6 +3,7 @@
 // developed at Datadog (https://www.datadoghq.com/). Copyright 2024-Present
 // Datadog, Inc.
 
+#include "ddog_profiling_utils.hpp"
 #include "unwind_state.hpp"
 
 #include <array>
@@ -16,6 +17,8 @@ std::vector<std::string> collect_symbols(UnwindState &state,
                                          blaze_symbolizer *symbolizer) {
   std::vector<std::string> symbols;
   auto &symbol_table = state.symbol_hdr._symbol_table;
+  const ddog_prof_ProfilesDictionary *dict =
+      state.symbol_hdr.profiles_dictionary();
   for (size_t iloc = 0; iloc < state.output.locs.size(); ++iloc) {
     std::string demangled_name;
     if (state.output.locs[iloc].symbol_idx == k_symbol_idx_null) {
@@ -40,7 +43,10 @@ std::vector<std::string> collect_symbols(UnwindState &state,
     } else {
       // Lookup the symbol from the symbol table.
       auto &symbol = symbol_table[state.output.locs[iloc].symbol_idx];
-      demangled_name = symbol._demangled_name;
+      const std::string_view name = symbol._function_id
+          ? get_string(dict, symbol._function_id->name)
+          : std::string_view{};
+      demangled_name = name.empty() ? "unknown" : std::string(name);
     }
     symbols.push_back(demangled_name);
   }
