@@ -10,6 +10,7 @@
 #include "ddres_def.hpp"
 #include "map_utils.hpp"
 #include "mapinfo_table.hpp"
+#include "symbol.hpp"
 #include <memory>
 #include <span>
 #include <string>
@@ -103,9 +104,20 @@ private:
           symbolizer(blaze_symbolizer_new_opts(&opts)),
           elf_src(std::move(elf_src)), use_debug(inlined_fns) {}
 
+    // Per-location cache entry for a blaze-symbolized address.
+    // Avoids re-interning strings into the ProfilesDictionary on every sample.
+    struct CachedLocation {
+      ddog_prof_FunctionId2 function;
+      uint32_t line;
+    };
+
     blaze_symbolizer_opts opts;
     std::unique_ptr<blaze_symbolizer, BlazeSymbolizerDeleter> symbolizer;
     ddprof::HeterogeneousLookupStringMap<std::string> demangled_names;
+    // elf_addr → ordered locations (outer frame last, inlined first)
+    std::unordered_map<ElfAddress_t, std::vector<CachedLocation>> function_cache;
+    // mapping_id → no-sym FunctionId2 (intern_function("", sopath) result)
+    std::unordered_map<ddog_prof_MappingId2, ddog_prof_FunctionId2> nosym_cache;
     std::string elf_src;
     bool visited{true};
     bool use_debug;
@@ -113,6 +125,13 @@ private:
 
   BlazeSymbolizerWrapper &get_symbolizer(FileInfoId_t file_id,
                                          const std::string &elf_src);
+
+  static void write_no_sym_cached(BlazeSymbolizerWrapper &wrapper,
+                                   ElfAddress_t ip,
+                                   ddog_prof_MappingId2 mapping_id,
+                                   const ddog_prof_ProfilesDictionary *dict,
+                                   std::span<ddog_prof_Location2> locations,
+                                   unsigned &write_index);
 
   std::unordered_map<FileInfoId_t, BlazeSymbolizerWrapper> _symbolizer_map;
   bool inlined_functions;

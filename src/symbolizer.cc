@@ -14,6 +14,30 @@
 
 namespace ddprof {
 
+// static
+void Symbolizer::write_no_sym_cached(BlazeSymbolizerWrapper &wrapper,
+                                      ElfAddress_t ip,
+                                      ddog_prof_MappingId2 mapping_id,
+                                      const ddog_prof_ProfilesDictionary *dict,
+                                      std::span<ddog_prof_Location2> locations,
+                                      unsigned &write_index) {
+  if (write_index >= locations.size()) {
+    return;
+  }
+  auto cache_it = wrapper.nosym_cache.find(mapping_id);
+  if (cache_it == wrapper.nosym_cache.end()) {
+    const auto sopath =
+        mapping_id ? get_string(dict, mapping_id->filename) : std::string_view{};
+    ddog_prof_FunctionId2 fn = intern_function(dict, {}, sopath);
+    cache_it = wrapper.nosym_cache.emplace(mapping_id, fn).first;
+  }
+  auto &loc = locations[write_index++];
+  loc.mapping = mapping_id;
+  loc.function = cache_it->second;
+  loc.address = ip;
+  loc.line = 0;
+}
+
 int Symbolizer::remove_unvisited() {
   // Remove all unvisited blaze_symbolizer instances from the map
   const auto count = std::erase_if(_symbolizer_map, [](const auto &item) {
@@ -94,13 +118,36 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
           // Some binaries expose a single symbol at address 0 (ex:
           // DD_AGENT_V1). Avoid emitting it so the backend still attempts
           // symbolication.
-          DDRES_CHECK_FWD(write_location2_no_sym(elf_addrs[i], mapping_id, dict,
-                                                 &locations[write_index++]));
+          write_no_sym_cached(symbolizer_wrapper, elf_addrs[i], mapping_id,
+                              dict, locations, write_index);
           continue;
         }
+        // Check the per-address function cache before hitting the dict.
+        const ElfAddress_t addr = elf_addrs[i];
+        auto cache_it = symbolizer_wrapper.function_cache.find(addr);
+        if (cache_it != symbolizer_wrapper.function_cache.end()) {
+          for (const auto &cl : cache_it->second) {
+            if (write_index >= locations.size()) {
+              return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
+            }
+            auto &loc = locations[write_index++];
+            loc.mapping = mapping_id;
+            loc.function = cl.function;
+            loc.address = addr;
+            loc.line = cl.line;
+          }
+          continue;
+        }
+        // Cache miss: intern strings, write locations, then cache the results.
+        const unsigned write_before = write_index;
         DDRES_CHECK_FWD(write_location2_blaze(
-            elf_addrs[i], symbolizer_wrapper.demangled_names, mapping_id,
+            addr, symbolizer_wrapper.demangled_names, mapping_id,
             *cur_sym, write_index, dict, locations));
+        auto &cached = symbolizer_wrapper.function_cache[addr];
+        for (unsigned j = write_before; j < write_index; ++j) {
+          cached.push_back({locations[j].function,
+                            static_cast<uint32_t>(locations[j].line)});
+        }
       }
       return {};
     }
@@ -109,9 +156,17 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
   // Handle the case of no blaze result
   // This can happen when file descriptors are exhausted
   // OR symbolization is disabled
-  for (auto el : elf_addrs) {
-    DDRES_CHECK_FWD(write_location2_no_sym(el, mapping_id, dict,
-                                           &locations[write_index++]));
+  if (!_disable_symbolization) {
+    auto &symbolizer_wrapper = get_symbolizer(file_id, elf_src);
+    for (auto el : elf_addrs) {
+      write_no_sym_cached(symbolizer_wrapper, el, mapping_id, dict, locations,
+                          write_index);
+    }
+  } else {
+    for (auto el : elf_addrs) {
+      DDRES_CHECK_FWD(
+          write_location2_no_sym(el, mapping_id, dict, &locations[write_index++]));
+    }
   }
 
   return {};
