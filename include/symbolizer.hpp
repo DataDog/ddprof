@@ -104,18 +104,43 @@ private:
           symbolizer(blaze_symbolizer_new_opts(&opts)),
           elf_src(std::move(elf_src)), use_debug(inlined_fns) {}
 
-    // Per-location cache entry for a blaze-symbolized address.
-    // Avoids re-interning strings into the ProfilesDictionary on every sample.
-    struct CachedLocation {
-      ddog_prof_FunctionId2 function;
-      uint32_t line;
+    // Two-level cache to avoid re-interning FunctionId2 handles on every
+    // sample.
+    //
+    // Level 1 — function identity (shared across all call sites of same
+    // function):
+    //   func_start_addr → FunctionId2  (outer frames, keyed by blaze_sym.addr)
+    //   pack(elf_addr, inlined_idx)    → FunctionId2  (inlined frames)
+    //
+    // Level 2 — per call-site (fast full hit when we've seen this exact
+    // address):
+    //   elf_addr → { func_start, lines[] }
+    //
+    // On a cache miss for a new elf_addr, we still run blaze but check
+    // function_id_cache[func_start] for the outer frame — saving
+    // intern_function calls when the same function is reached from multiple
+    // call sites.
+
+    struct AddressCacheEntry {
+      ElfAddress_t func_start;     // blaze_sym.addr (function start address)
+      std::vector<uint32_t> lines; // line per frame: inlined first, outer last
     };
+
+    // function_id_cache keys:
+    //   outer frame   → blaze_sym.addr  (low bits of address, top tag bits 0)
+    //   inlined frame → elf_addr | ((idx+1) << kInlinedTagShift)
+    // ELF virtual addresses on Linux are at most 48 bits; the top 16 bits are
+    // used as a tag to distinguish inlined-frame entries from outer-frame ones.
+    static constexpr unsigned kInlinedTagShift = 48;
+    static uint64_t inlined_key(ElfAddress_t addr, unsigned idx) {
+      return addr | (static_cast<uint64_t>(idx + 1) << kInlinedTagShift);
+    }
 
     blaze_symbolizer_opts opts;
     std::unique_ptr<blaze_symbolizer, BlazeSymbolizerDeleter> symbolizer;
     ddprof::HeterogeneousLookupStringMap<std::string> demangled_names;
-    // elf_addr → ordered locations (outer frame last, inlined first)
-    std::unordered_map<ElfAddress_t, std::vector<CachedLocation>> function_cache;
+    std::unordered_map<uint64_t, ddog_prof_FunctionId2> function_id_cache;
+    std::unordered_map<ElfAddress_t, AddressCacheEntry> address_cache;
     // mapping_id → no-sym FunctionId2 (intern_function("", sopath) result)
     std::unordered_map<ddog_prof_MappingId2, ddog_prof_FunctionId2> nosym_cache;
     std::string elf_src;
@@ -126,7 +151,7 @@ private:
   BlazeSymbolizerWrapper &get_symbolizer(FileInfoId_t file_id,
                                          const std::string &elf_src);
 
-  static void write_no_sym_cached(BlazeSymbolizerWrapper &wrapper,
+  static DDRes write_no_sym_cached(BlazeSymbolizerWrapper &wrapper,
                                    ElfAddress_t ip,
                                    ddog_prof_MappingId2 mapping_id,
                                    const ddog_prof_ProfilesDictionary *dict,

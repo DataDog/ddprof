@@ -201,11 +201,13 @@ add_unit_test(
   ddprof_pprof-ut.cc
   ../src/ddog_profiling_utils.cc
   ../src/ddprof_cmdline_watcher.cc
+  ../src/ddprof_stats.cc
   ../src/pprof/ddprof_pprof.cc
   ../src/symbol_hdr.cc
   ../src/symbolizer.cc
   ../src/demangler/demangler.cc
   ../src/perf_watcher.cc
+  ../src/statsd.cc
   ../src/tracepoint_config.cc
   LIBRARIES Datadog::Profiling DDProf::Parser llvm-demangle
   DEFINITIONS MYNAME="ddprof_pprof-ut")

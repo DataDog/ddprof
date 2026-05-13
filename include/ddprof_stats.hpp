@@ -35,6 +35,10 @@ namespace ddprof {
   X(SYMBOLS_JIT_READS, "symbols.jit.reads", STAT_GAUGE)                        \
   X(SYMBOLS_JIT_FAILED_LOOKUPS, "symbols.jit.failed_lookups", STAT_GAUGE)      \
   X(SYMBOLS_JIT_SYMBOL_COUNT, "symbols.jit.symbol_count", STAT_GAUGE)          \
+  X(SYMBOLS_BLAZE_INTERN_FN_CALLS, "symbols.blaze.intern_fn_calls",            \
+    STAT_GAUGE)                                                                \
+  X(SYMBOLS_BLAZE_ADDR_MISSES, "symbols.blaze.addr_misses", STAT_GAUGE)        \
+  X(SYMBOLS_BLAZE_ADDR_HITS, "symbols.blaze.addr_hits", STAT_GAUGE)            \
   X(PROFILER_RSS, "profiler.rss", STAT_GAUGE)                                  \
   X(PROFILER_CPU_USAGE, "profiler.cpu_usage.millicores", STAT_GAUGE)           \
   X(DSO_NEW_DSO, "dso.new", STAT_GAUGE)                                        \
