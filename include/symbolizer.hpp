@@ -110,7 +110,7 @@ private:
     // Level 1 — function identity (shared across all call sites of same
     // function):
     //   func_start_addr → FunctionId2  (outer frames, keyed by blaze_sym.addr)
-    //   pack(elf_addr, inlined_idx)    → FunctionId2  (inlined frames)
+    //   {elf_addr, inlined_idx}        → FunctionId2  (inlined frames)
     //
     // Level 2 — per call-site (fast full hit when we've seen this exact
     // address):
@@ -126,20 +126,32 @@ private:
       std::vector<uint32_t> lines; // line per frame: inlined first, outer last
     };
 
-    // function_id_cache keys:
-    //   outer frame   → blaze_sym.addr  (low bits of address, top tag bits 0)
-    //   inlined frame → elf_addr | ((idx+1) << kInlinedTagShift)
-    // ELF virtual addresses on Linux are at most 48 bits; the top 16 bits are
-    // used as a tag to distinguish inlined-frame entries from outer-frame ones.
-    static constexpr unsigned kInlinedTagShift = 48;
-    static uint64_t inlined_key(ElfAddress_t addr, unsigned idx) {
-      return addr | (static_cast<uint64_t>(idx + 1) << kInlinedTagShift);
-    }
+    // Pair hash for the inlined_id_cache.
+    // In theory a pair<ElfAddress_t, unsigned> could also be packed into a
+    // uint64_t (ELF vaddrs are well under 48 bits on both aarch64 and x86_64
+    // in practice), but using std::pair avoids any architectural assumption.
+    struct InlinedKeyHash {
+      std::size_t operator()(const std::pair<ElfAddress_t, unsigned> &p) const {
+        // Boost-style hash_combine: golden-ratio constant for avalanche mixing.
+        static constexpr std::size_t kGoldenRatio = 0x9E3779B9U;
+        static constexpr unsigned kShiftLeft = 6;
+        static constexpr unsigned kShiftRight = 2;
+        std::size_t h = std::hash<ElfAddress_t>{}(p.first);
+        h ^= std::hash<unsigned>{}(p.second) + kGoldenRatio +
+             (h << kShiftLeft) + (h >> kShiftRight);
+        return h;
+      }
+    };
 
     blaze_symbolizer_opts opts;
     std::unique_ptr<blaze_symbolizer, BlazeSymbolizerDeleter> symbolizer;
     ddprof::HeterogeneousLookupStringMap<std::string> demangled_names;
-    std::unordered_map<uint64_t, ddog_prof_FunctionId2> function_id_cache;
+    // func_start → FunctionId2 (outer frames, shared across all call sites)
+    std::unordered_map<ElfAddress_t, ddog_prof_FunctionId2> function_id_cache;
+    // {elf_addr, inlined_idx} → FunctionId2 (inlined frames, per call site)
+    std::unordered_map<std::pair<ElfAddress_t, unsigned>, ddog_prof_FunctionId2,
+                       InlinedKeyHash>
+        inlined_id_cache;
     std::unordered_map<ElfAddress_t, AddressCacheEntry> address_cache;
     // mapping_id → no-sym FunctionId2 (intern_function("", sopath) result)
     std::unordered_map<ddog_prof_MappingId2, ddog_prof_FunctionId2> nosym_cache;

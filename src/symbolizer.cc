@@ -128,6 +128,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
       src_elf.debug_syms = false;
       // Invalidate caches: debug-derived symbols/lines are no longer valid.
       symbolizer_wrapper.function_id_cache.clear();
+      symbolizer_wrapper.inlined_id_cache.clear();
       symbolizer_wrapper.address_cache.clear();
       blaze_res = blaze_symbolize_elf_virt_offsets(
           symbolizer_wrapper.symbolizer.get(), &src_elf, elf_addrs.data(),
@@ -161,12 +162,11 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
             if (write_index >= locations.size()) {
               return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
             }
-            const uint64_t fn_key = (j < n - 1)
-                ? BlazeSymbolizerWrapper::inlined_key(addr, j)
-                : entry.func_start;
             auto &loc = locations[write_index++];
             loc.mapping = mapping_id;
-            loc.function = symbolizer_wrapper.function_id_cache.at(fn_key);
+            loc.function = (j < n - 1)
+                ? symbolizer_wrapper.inlined_id_cache.at({addr, j})
+                : symbolizer_wrapper.function_id_cache.at(entry.func_start);
             loc.address = addr;
             loc.line = entry.lines[j];
           }
@@ -201,17 +201,18 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
               : sopath;
           const auto inlined_idx =
               static_cast<unsigned>(cur_sym->inlined_cnt - 1 - k);
-          const uint64_t key =
-              BlazeSymbolizerWrapper::inlined_key(addr, inlined_idx);
-          auto fn_it = symbolizer_wrapper.function_id_cache.find(key);
-          if (fn_it == symbolizer_wrapper.function_id_cache.end()) {
+          const auto inlined_key = std::make_pair(addr, inlined_idx);
+          auto fn_it = symbolizer_wrapper.inlined_id_cache.find(inlined_key);
+          if (fn_it == symbolizer_wrapper.inlined_id_cache.end()) {
             ddprof_stats_add(STATS_SYMBOLS_BLAZE_INTERN_FN_CALLS, 1, nullptr);
             ddog_prof_FunctionId2 fn = intern_function(dict, dname, fname);
             if (!fn) {
               DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                                      "OOM interning inlined function");
             }
-            fn_it = symbolizer_wrapper.function_id_cache.emplace(key, fn).first;
+            fn_it =
+                symbolizer_wrapper.inlined_id_cache.emplace(inlined_key, fn)
+                    .first;
           }
           auto &loc = locations[write_index++];
           loc.mapping = mapping_id;
