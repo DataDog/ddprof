@@ -81,6 +81,18 @@ public:
   int remove_unvisited();
   void reset_unvisited_flag();
 
+  struct BlazeStats {
+    uint64_t addr_hits{0};
+    uint64_t addr_misses{0};
+    uint64_t intern_fn_calls{0};
+  };
+  // Returns accumulated stats since last call, then resets.
+  BlazeStats get_and_reset_blaze_stats() {
+    BlazeStats s = _blaze_stats;
+    _blaze_stats = {};
+    return s;
+  }
+
 private:
   struct BlazeSymbolizerDeleter {
     void operator()(blaze_symbolizer *ptr) const {
@@ -173,5 +185,6 @@ private:
   std::unordered_map<FileInfoId_t, BlazeSymbolizerWrapper> _symbolizer_map;
   bool inlined_functions;
   bool _disable_symbolization;
+  BlazeStats _blaze_stats{};
 };
 } // namespace ddprof

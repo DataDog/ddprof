@@ -6,7 +6,6 @@
 #include "symbolizer.hpp"
 
 #include "ddog_profiling_utils.hpp" // for write_location_blaze
-#include "ddprof_stats.hpp"
 #include "ddres.hpp"
 #include "demangler/demangler.hpp"
 #include "logger.hpp"
@@ -155,7 +154,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         // Level-2 hit: exact address seen before — write from caches, no blaze.
         auto addr_it = symbolizer_wrapper.address_cache.find(addr);
         if (addr_it != symbolizer_wrapper.address_cache.end()) {
-          ddprof_stats_add(STATS_SYMBOLS_BLAZE_ADDR_HITS, 1, nullptr);
+          ++_blaze_stats.addr_hits;
           const auto &entry = addr_it->second;
           const unsigned n = entry.lines.size();
           for (unsigned j = 0; j < n; ++j) {
@@ -177,7 +176,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         // check function_id_cache[func_start] for the outer frame — saving
         // intern_function when the same function is reached from a new call
         // site.
-        ddprof_stats_add(STATS_SYMBOLS_BLAZE_ADDR_MISSES, 1, nullptr);
+        ++_blaze_stats.addr_misses;
         BlazeSymbolizerWrapper::AddressCacheEntry &new_entry =
             symbolizer_wrapper.address_cache[addr];
         new_entry.func_start = cur_sym->addr;
@@ -204,7 +203,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
           const auto inlined_key = std::make_pair(addr, inlined_idx);
           auto fn_it = symbolizer_wrapper.inlined_id_cache.find(inlined_key);
           if (fn_it == symbolizer_wrapper.inlined_id_cache.end()) {
-            ddprof_stats_add(STATS_SYMBOLS_BLAZE_INTERN_FN_CALLS, 1, nullptr);
+            ++_blaze_stats.intern_fn_calls;
             ddog_prof_FunctionId2 fn = intern_function(dict, dname, fname);
             if (!fn) {
               DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
@@ -234,7 +233,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         auto outer_it =
             symbolizer_wrapper.function_id_cache.find(cur_sym->addr);
         if (outer_it == symbolizer_wrapper.function_id_cache.end()) {
-          ddprof_stats_add(STATS_SYMBOLS_BLAZE_INTERN_FN_CALLS, 1, nullptr);
+          ++_blaze_stats.intern_fn_calls;
           ddog_prof_FunctionId2 fn = intern_function(dict, dname, fname);
           if (!fn) {
             DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "OOM interning function");

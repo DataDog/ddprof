@@ -98,7 +98,8 @@ inline void export_time_set(DDProfContext &ctx) {
           .count();
 }
 
-DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
+DDRes symbols_update_stats(const SymbolHdr &symbol_hdr,
+                           Symbolizer *symbolizer) {
   const auto &stats = symbol_hdr._runtime_symbol_lookup.get_stats();
   DDRES_CHECK_FWD(
       ddprof_stats_set(STATS_SYMBOLS_JIT_READS, stats._nb_jit_reads));
@@ -106,6 +107,15 @@ DDRes symbols_update_stats(const SymbolHdr &symbol_hdr) {
                                    stats._nb_failed_lookups));
   DDRES_CHECK_FWD(
       ddprof_stats_set(STATS_SYMBOLS_JIT_SYMBOL_COUNT, stats._symbol_count));
+  if (symbolizer) {
+    const auto blaze = symbolizer->get_and_reset_blaze_stats();
+    DDRES_CHECK_FWD(ddprof_stats_set(STATS_SYMBOLS_BLAZE_INTERN_FN_CALLS,
+                                     static_cast<long>(blaze.intern_fn_calls)));
+    DDRES_CHECK_FWD(ddprof_stats_set(STATS_SYMBOLS_BLAZE_ADDR_MISSES,
+                                     static_cast<long>(blaze.addr_misses)));
+    DDRES_CHECK_FWD(ddprof_stats_set(STATS_SYMBOLS_BLAZE_ADDR_HITS,
+                                     static_cast<long>(blaze.addr_hits)));
+  }
   return {};
 }
 
@@ -141,7 +151,8 @@ DDRes worker_update_stats(DDProfWorkerContext &worker_context,
   // Symbol stats
   ddprof_stats_set(STATS_UNUSED_SYMBOLS_BINARIES_COUNT,
                    count_symbolizer_cleared);
-  DDRES_CHECK_FWD(symbols_update_stats(us.symbol_hdr));
+  DDRES_CHECK_FWD(
+      symbols_update_stats(us.symbol_hdr, worker_context.symbolizer));
 
   long target_cpu_nsec;
   ddprof_stats_get(STATS_TARGET_CPU_USAGE, &target_cpu_nsec);
