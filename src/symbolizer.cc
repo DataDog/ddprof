@@ -210,9 +210,8 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
               DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC,
                                      "OOM interning inlined function");
             }
-            fn_it =
-                symbolizer_wrapper.inlined_id_cache.emplace(inlined_key, fn)
-                    .first;
+            fn_it = symbolizer_wrapper.inlined_id_cache.emplace(inlined_key, fn)
+                        .first;
           }
           auto &loc = locations[write_index++];
           loc.mapping = mapping_id;

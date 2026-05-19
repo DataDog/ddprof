@@ -138,7 +138,7 @@ private:
         static constexpr unsigned kShiftRight = 2;
         std::size_t h = std::hash<ElfAddress_t>{}(p.first);
         h ^= std::hash<unsigned>{}(p.second) + kGoldenRatio +
-             (h << kShiftLeft) + (h >> kShiftRight);
+            (h << kShiftLeft) + (h >> kShiftRight);
         return h;
       }
     };
