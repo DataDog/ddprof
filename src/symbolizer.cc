@@ -177,9 +177,16 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         // intern_function when the same function is reached from a new call
         // site.
         ++_blaze_stats.addr_misses;
-        BlazeSymbolizerWrapper::AddressCacheEntry &new_entry =
-            symbolizer_wrapper.address_cache[addr];
-        new_entry.func_start = cur_sym->addr;
+
+        // Build the address_cache entry locally and commit it only after all
+        // frames are written successfully. An early return
+        // (DD_WHAT_UW_MAX_DEPTH) before the outer frame would leave a partial
+        // entry whose func_start has no matching function_id_cache value,
+        // causing .at() to throw on the next sample. function_id_cache /
+        // inlined_id_cache can be partially populated without harm — those
+        // handles are valid; only address_cache must be all-or-nothing.
+        BlazeSymbolizerWrapper::AddressCacheEntry candidate;
+        candidate.func_start = cur_sym->addr;
 
         constexpr std::string_view undef{};
         const auto sopath = mapping_id ? get_string(dict, mapping_id->filename)
@@ -217,7 +224,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
           loc.function = fn_it->second;
           loc.address = addr;
           loc.line = inlined->code_info.line;
-          new_entry.lines.push_back(inlined->code_info.line);
+          candidate.lines.push_back(inlined->code_info.line);
         }
 
         // Outer frame — shared across all call sites of the same function
@@ -247,7 +254,9 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         loc.function = outer_it->second;
         loc.address = addr;
         loc.line = cur_sym->code_info.line;
-        new_entry.lines.push_back(cur_sym->code_info.line);
+        candidate.lines.push_back(cur_sym->code_info.line);
+        // All frames written — safe to commit the address cache entry.
+        symbolizer_wrapper.address_cache[addr] = std::move(candidate);
       }
       return {};
     }
