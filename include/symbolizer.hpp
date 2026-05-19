@@ -8,6 +8,7 @@
 #include "ddprof_defs.hpp"
 #include "ddprof_file_info-i.hpp"
 #include "ddres_def.hpp"
+#include "hash_helper.hpp"
 #include "map_utils.hpp"
 #include "mapinfo_table.hpp"
 #include "symbol.hpp"
@@ -138,19 +139,14 @@ private:
       std::vector<uint32_t> lines; // line per frame: inlined first, outer last
     };
 
-    // Pair hash for the inlined_id_cache.
+    // Pair hash for the inlined_id_cache using the shared hash_combine helper.
     // In theory a pair<ElfAddress_t, unsigned> could also be packed into a
     // uint64_t (ELF vaddrs are well under 48 bits on both aarch64 and x86_64
     // in practice), but using std::pair avoids any architectural assumption.
     struct InlinedKeyHash {
       std::size_t operator()(const std::pair<ElfAddress_t, unsigned> &p) const {
-        // Boost-style hash_combine: golden-ratio constant for avalanche mixing.
-        static constexpr std::size_t kGoldenRatio = 0x9E3779B9U;
-        static constexpr unsigned kShiftLeft = 6;
-        static constexpr unsigned kShiftRight = 2;
         std::size_t h = std::hash<ElfAddress_t>{}(p.first);
-        h ^= std::hash<unsigned>{}(p.second) + kGoldenRatio +
-            (h << kShiftLeft) + (h >> kShiftRight);
+        hash_combine(h, p.second);
         return h;
       }
     };
