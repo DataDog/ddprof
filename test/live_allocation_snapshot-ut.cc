@@ -19,8 +19,8 @@ Snapshot make_sample_snapshot() {
   uo.container_id = "ctr-abc";
   uo.exe_name = "/usr/bin/myapp";
   uo.thread_name = "worker-0";
-  uo.locs.push_back({/*ip*/ 0x1000, /*elf_addr*/ 0x500, /*lineno*/ 42,
-                     "malloc", "__libc_malloc", "malloc.c",
+  uo.locs.push_back({/*ip*/ 0x1000, /*elf_addr*/ 0x500, /*lineno*/ 42, "malloc",
+                     "__libc_malloc", "malloc.c",
                      /*map_low*/ 0x10000, /*map_high*/ 0x20000,
                      /*map_offset*/ 0, "/lib/libc.so", "abcdef0123"});
   uo.locs.push_back({0x2000, 0x600, 0, "main", "", "main.c", 0x30000, 0x40000,

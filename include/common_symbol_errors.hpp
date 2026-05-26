@@ -15,9 +15,12 @@ using namespace std::string_view_literals;
 namespace ddprof {
 
 inline constexpr std::array<std::string_view, 7> k_common_frame_names = {
-    "[truncated]"sv,           "[unknown mapping]"sv,
-    "[unwind failure]"sv,      "[incomplete]"sv,
-    "[lost]"sv,                "[maximum pids]"sv,
+    "[truncated]"sv,
+    "[unknown mapping]"sv,
+    "[unwind failure]"sv,
+    "[incomplete]"sv,
+    "[lost]"sv,
+    "[maximum pids]"sv,
     "[live-alloc cleared]"sv};
 
 enum SymbolErrors : std::uint8_t {

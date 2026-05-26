@@ -12,9 +12,9 @@
 #include "dso_hdr.hpp"
 #include "exporter/ddprof_exporter.hpp"
 #include "live_allocation_snapshot.hpp"
-#include "persistent_worker_state.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
+#include "persistent_worker_state.hpp"
 #include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
 #include "procutils.hpp"
@@ -575,13 +575,13 @@ DDRes worker_library_init(DDProfContext &ctx,
       if (live_alloc_snapshot::read_from_fd(
               persistent_worker_state->live_alloc_snapshot_fd, snap)) {
         if (!snap.stacks.empty() || !snap.pids.empty()) {
-          live_alloc_snapshot::restore_snapshot(
-              snap, ctx.worker_ctx.live_allocation,
-              ctx.worker_ctx.us->symbol_hdr);
+          live_alloc_snapshot::restore_snapshot(snap,
+                                                ctx.worker_ctx.live_allocation,
+                                                ctx.worker_ctx.us->symbol_hdr);
           LG_NTC("[live-alloc] Snapshot restored: stacks=%zu pids=%zu "
                  "cleared=%u dropped_pids=%u",
-                 snap.stacks.size(), snap.pids.size(),
-                 snap.cleared_addresses, snap.dropped_pids);
+                 snap.stacks.size(), snap.pids.size(), snap.cleared_addresses,
+                 snap.dropped_pids);
         }
       }
     }

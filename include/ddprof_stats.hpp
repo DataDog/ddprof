@@ -47,8 +47,8 @@ namespace ddprof {
   X(PROFILE_DURATION, "profile.duration_ms", STAT_GAUGE)                       \
   X(AGGREGATION_AVG_TIME, "aggregation.avg_time_ns", STAT_GAUGE)               \
   X(BACKPOPULATE_COUNT, "backpopulate.count", STAT_GAUGE)                      \
-  X(LIVE_ALLOC_SNAPSHOT_BYTES, "live_alloc.snapshot.bytes", STAT_GAUGE)         \
-  X(LIVE_ALLOC_CLEARED_STACKS, "live_alloc.snapshot.cleared_stacks",            \
+  X(LIVE_ALLOC_SNAPSHOT_BYTES, "live_alloc.snapshot.bytes", STAT_GAUGE)        \
+  X(LIVE_ALLOC_CLEARED_STACKS, "live_alloc.snapshot.cleared_stacks",           \
     STAT_GAUGE)                                                                \
   X(LIVE_ALLOC_DROPPED_PIDS, "live_alloc.snapshot.dropped_pids", STAT_GAUGE)
 

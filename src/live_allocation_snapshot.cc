@@ -33,18 +33,18 @@ constexpr std::size_t cost_string(std::string_view sv) {
 }
 
 std::size_t cost_funloc(const FunLocPortable &fl) {
-  return sizeof(uint64_t) * 2 +  // ip + elf_addr
-         sizeof(uint32_t) +      // lineno
-         sizeof(uint64_t) * 3 +  // map_low / map_high / map_offset
-         cost_string(fl.fn_name) + cost_string(fl.fn_system_name) +
-         cost_string(fl.fn_file) + cost_string(fl.map_filename) +
-         cost_string(fl.map_build_id);
+  return sizeof(uint64_t) * 2 + // ip + elf_addr
+      sizeof(uint32_t) +        // lineno
+      sizeof(uint64_t) * 3 +    // map_low / map_high / map_offset
+      cost_string(fl.fn_name) + cost_string(fl.fn_system_name) +
+      cost_string(fl.fn_file) + cost_string(fl.map_filename) +
+      cost_string(fl.map_build_id);
 }
 
 std::size_t cost_stack(const UnwindOutputPortable &uo) {
   std::size_t c = sizeof(int32_t) * 2 + // pid + tid
-                  cost_string(uo.container_id) + cost_string(uo.exe_name) +
-                  cost_string(uo.thread_name) + sizeof(uint32_t); // n_locs
+      cost_string(uo.container_id) + cost_string(uo.exe_name) +
+      cost_string(uo.thread_name) + sizeof(uint32_t); // n_locs
   for (const auto &fl : uo.locs) {
     c += cost_funloc(fl);
   }
@@ -56,7 +56,7 @@ constexpr std::size_t k_address_entry_cost =
 
 std::size_t cost_pid_entry(const PidEntry &p) {
   return sizeof(int32_t) * 2 + sizeof(uint32_t) * 3 +
-         p.addresses.size() * k_address_entry_cost;
+      p.addresses.size() * k_address_entry_cost;
 }
 
 constexpr std::size_t k_header_cost = sizeof(k_magic) + sizeof(uint32_t) * 5;
@@ -104,8 +104,7 @@ FunLocPortable funloc_to_portable(const FunLoc &fl,
   }
 
   if (fl.map_info_idx != k_mapinfo_idx_null &&
-      static_cast<size_t>(fl.map_info_idx) <
-          symbol_hdr._mapinfo_table.size()) {
+      static_cast<size_t>(fl.map_info_idx) < symbol_hdr._mapinfo_table.size()) {
     ddog_prof_MappingId2 mid = symbol_hdr._mapinfo_table[fl.map_info_idx];
     if (mid) {
       out.map_low = mid->memory_start;
@@ -305,10 +304,9 @@ Snapshot capture_snapshot(const LiveAllocation &live_alloc,
     }
     std::vector<uint32_t> pid_order(snapshot.pids.size());
     std::iota(pid_order.begin(), pid_order.end(), 0u);
-    std::sort(pid_order.begin(), pid_order.end(),
-              [&](uint32_t a, uint32_t b) {
-                return pid_total_value[a] < pid_total_value[b];
-              });
+    std::sort(pid_order.begin(), pid_order.end(), [&](uint32_t a, uint32_t b) {
+      return pid_total_value[a] < pid_total_value[b];
+    });
     std::vector<bool> pid_dropped(snapshot.pids.size(), false);
     for (uint32_t pidx : pid_order) {
       if (projected <= max_bytes) {
@@ -453,8 +451,7 @@ bool deserialize(const uint8_t *data, std::size_t size, Snapshot &out) {
   out.pids.resize(n_pids);
   for (auto &p : out.pids) {
     if (!r.i32(p.watcher_pos) || !r.i32(p.pid) ||
-        !r.u32(p.address_conflict_count) ||
-        !r.u32(p.tracked_address_count)) {
+        !r.u32(p.address_conflict_count) || !r.u32(p.tracked_address_count)) {
       return false;
     }
     uint32_t n_addr = 0;
@@ -485,8 +482,7 @@ bool write_to_fd(int fd, const Snapshot &snapshot) {
   }
   std::size_t written = 0;
   while (written < buf.size()) {
-    ssize_t const n =
-        write(fd, buf.data() + written, buf.size() - written);
+    ssize_t const n = write(fd, buf.data() + written, buf.size() - written);
     if (n < 0) {
       if (errno == EINTR) {
         continue;
@@ -567,8 +563,7 @@ UnwindOutput build_cleared_stack(SymbolHdr &symbol_hdr) {
 }
 
 UnwindOutput portable_to_uo(const UnwindOutputPortable &p,
-                            SymbolHdr &symbol_hdr,
-                            LiveAllocation &live_alloc) {
+                            SymbolHdr &symbol_hdr, LiveAllocation &live_alloc) {
   const auto *dict = symbol_hdr.profiles_dictionary();
   UnwindOutput uo;
   uo.pid = p.pid;
@@ -578,9 +573,9 @@ UnwindOutput portable_to_uo(const UnwindOutputPortable &p,
   uo.thread_name = live_alloc.intern_restored_string(p.thread_name);
   uo.locs.reserve(p.locs.size());
   for (const auto &fl : p.locs) {
-    ddog_prof_MappingId2 mid = intern_mapping(
-        dict, fl.map_low, fl.map_high, fl.map_offset, fl.map_filename,
-        fl.map_build_id);
+    ddog_prof_MappingId2 mid =
+        intern_mapping(dict, fl.map_low, fl.map_high, fl.map_offset,
+                       fl.map_filename, fl.map_build_id);
     symbol_hdr._mapinfo_table.emplace_back(mid);
     auto const map_idx =
         static_cast<MapInfoIdx_t>(symbol_hdr._mapinfo_table.size() - 1);
@@ -628,11 +623,10 @@ void restore_snapshot(const Snapshot &snapshot, LiveAllocation &live_alloc,
 
   for (const auto &p : snapshot.pids) {
     for (const auto &a : p.addresses) {
-      const UnwindOutput &uo =
-          (a.stack_idx == k_cleared_stack_idx) ? cleared_uo
-                                               : rebuilt[a.stack_idx];
-      live_alloc.register_allocation(uo, a.addr, a.value, p.watcher_pos,
-                                     p.pid);
+      const UnwindOutput &uo = (a.stack_idx == k_cleared_stack_idx)
+          ? cleared_uo
+          : rebuilt[a.stack_idx];
+      live_alloc.register_allocation(uo, a.addr, a.value, p.watcher_pos, p.pid);
     }
     // Carry over the library/profiler tracked-address counters so the
     // post-restore mismatch warning is anchored at the same baseline.

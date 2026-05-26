@@ -446,8 +446,7 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
       // resume heap tracking without losing in-flight live addresses.
       int const snap_fd =
           ctx.worker_ctx.persistent_worker_state->live_alloc_snapshot_fd;
-      if (snap_fd >= 0 &&
-          context_allocation_profiling_watcher_idx(ctx) != -1) {
+      if (snap_fd >= 0 && context_allocation_profiling_watcher_idx(ctx) != -1) {
         auto snap = live_alloc_snapshot::capture_snapshot(
             ctx.worker_ctx.live_allocation, ctx.worker_ctx.us->symbol_hdr);
         if (!live_alloc_snapshot::write_to_fd(snap_fd, snap)) {
@@ -460,8 +459,8 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
           }
           LG_NTC("[live-alloc] Snapshot written: stacks=%zu pids=%zu "
                  "cleared=%u dropped_pids=%u",
-                 snap.stacks.size(), snap.pids.size(),
-                 snap.cleared_addresses, snap.dropped_pids);
+                 snap.stacks.size(), snap.pids.size(), snap.cleared_addresses,
+                 snap.dropped_pids);
           ddprof_stats_set(STATS_LIVE_ALLOC_CLEARED_STACKS,
                            snap.cleared_addresses);
           ddprof_stats_set(STATS_LIVE_ALLOC_DROPPED_PIDS, snap.dropped_pids);
