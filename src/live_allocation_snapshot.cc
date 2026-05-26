@@ -33,16 +33,16 @@ constexpr std::size_t cost_string(std::string_view sv) {
 }
 
 std::size_t cost_funloc(const FunLocPortable &fl) {
-  return sizeof(uint64_t) * 2 + // ip + elf_addr
-      sizeof(uint32_t) +        // lineno
-      sizeof(uint64_t) * 3 +    // map_low / map_high / map_offset
+  return (sizeof(uint64_t) * 2) + // ip + elf_addr
+      sizeof(uint32_t) +          // lineno
+      (sizeof(uint64_t) * 3) +    // map_low / map_high / map_offset
       cost_string(fl.fn_name) + cost_string(fl.fn_system_name) +
       cost_string(fl.fn_file) + cost_string(fl.map_filename) +
       cost_string(fl.map_build_id);
 }
 
 std::size_t cost_stack(const UnwindOutputPortable &uo) {
-  std::size_t c = sizeof(int32_t) * 2 + // pid + tid
+  std::size_t c = (sizeof(int32_t) * 2) + // pid + tid
       cost_string(uo.container_id) + cost_string(uo.exe_name) +
       cost_string(uo.thread_name) + sizeof(uint32_t); // n_locs
   for (const auto &fl : uo.locs) {
@@ -55,11 +55,11 @@ constexpr std::size_t k_address_entry_cost =
     sizeof(uint64_t) + sizeof(int64_t) + sizeof(uint32_t);
 
 std::size_t cost_pid_entry(const PidEntry &p) {
-  return sizeof(int32_t) * 2 + sizeof(uint32_t) * 3 +
-      p.addresses.size() * k_address_entry_cost;
+  return (sizeof(int32_t) * 2) + (sizeof(uint32_t) * 3) +
+      (p.addresses.size() * k_address_entry_cost);
 }
 
-constexpr std::size_t k_header_cost = sizeof(k_magic) + sizeof(uint32_t) * 5;
+constexpr std::size_t k_header_cost = sizeof(k_magic) + (sizeof(uint32_t) * 5);
 
 std::size_t estimate_size(const Snapshot &s) {
   std::size_t c = k_header_cost;
@@ -136,7 +136,7 @@ UnwindOutputPortable uo_to_portable(const UnwindOutput &uo,
 
 class Writer {
 public:
-  explicit Writer(std::vector<uint8_t> &out) : _out(out) {}
+  explicit Writer(std::vector<uint8_t> *out) : _out(out) {}
 
   void u32(uint32_t v) { raw(&v, sizeof(v)); }
   void i32(int32_t v) { raw(&v, sizeof(v)); }
@@ -148,11 +148,11 @@ public:
   }
   void raw(const void *p, std::size_t n) {
     const auto *bytes = static_cast<const uint8_t *>(p);
-    _out.insert(_out.end(), bytes, bytes + n);
+    _out->insert(_out->end(), bytes, bytes + n);
   }
 
 private:
-  std::vector<uint8_t> &_out;
+  std::vector<uint8_t> *_out;
 };
 
 class Reader {
@@ -268,7 +268,7 @@ Snapshot capture_snapshot(const LiveAllocation &live_alloc,
     }
   }
   std::vector<uint32_t> stack_order(snapshot.stacks.size());
-  std::iota(stack_order.begin(), stack_order.end(), 0u);
+  std::iota(stack_order.begin(), stack_order.end(), 0U);
   std::sort(stack_order.begin(), stack_order.end(),
             [&](uint32_t a, uint32_t b) {
               return stack_total_value[a] < stack_total_value[b];
@@ -281,7 +281,7 @@ Snapshot capture_snapshot(const LiveAllocation &live_alloc,
 
   std::vector<bool> stack_dropped(snapshot.stacks.size(), false);
   bool cleared_stack_needed = false;
-  for (uint32_t idx : stack_order) {
+  for (uint32_t const idx : stack_order) {
     if (projected <= max_bytes) {
       break;
     }
@@ -303,12 +303,12 @@ Snapshot capture_snapshot(const LiveAllocation &live_alloc,
       }
     }
     std::vector<uint32_t> pid_order(snapshot.pids.size());
-    std::iota(pid_order.begin(), pid_order.end(), 0u);
+    std::iota(pid_order.begin(), pid_order.end(), 0U);
     std::sort(pid_order.begin(), pid_order.end(), [&](uint32_t a, uint32_t b) {
       return pid_total_value[a] < pid_total_value[b];
     });
     std::vector<bool> pid_dropped(snapshot.pids.size(), false);
-    for (uint32_t pidx : pid_order) {
+    for (uint32_t const pidx : pid_order) {
       if (projected <= max_bytes) {
         break;
       }
@@ -366,7 +366,7 @@ Snapshot capture_snapshot(const LiveAllocation &live_alloc,
 void serialize(const Snapshot &s, std::vector<uint8_t> &out) {
   out.clear();
   out.reserve(estimate_size(s));
-  Writer w(out);
+  Writer w(&out);
   w.raw(k_magic.data(), k_magic.size());
   w.u32(k_version);
   w.u32(static_cast<uint32_t>(s.stacks.size()));
@@ -548,7 +548,7 @@ UnwindOutput build_cleared_stack(SymbolHdr &symbol_hdr) {
       dict, k_common_frame_names[SymbolErrors::live_alloc_cleared], {});
   ddog_prof_MappingId2 mp = intern_mapping(dict, 0, 0, 0, {}, {});
 
-  symbol_hdr._symbol_table.emplace_back(0u, fn);
+  symbol_hdr._symbol_table.emplace_back(0U, fn);
   auto const symbol_idx =
       static_cast<SymbolIdx_t>(symbol_hdr._symbol_table.size() - 1);
   symbol_hdr._mapinfo_table.emplace_back(mp);
@@ -562,6 +562,47 @@ UnwindOutput build_cleared_stack(SymbolHdr &symbol_hdr) {
   return uo;
 }
 
+// TODO(r1viollet): unify caching strategies across the profiler.
+//
+// Today there are four overlapping caches that all describe symbols and
+// mappings, and they don't talk to each other on the restore path:
+//
+//   L1  libdatadog ProfilesDictionary  : interns (Function2, Mapping2,
+//                                        string) by content; returns stable
+//                                        opaque handles (FunctionId2*,
+//                                        MappingId2*).
+//   L2  SymbolTable / MapInfoTable     : append-only vectors of
+//                                        {lineno, FunctionId2*} and
+//                                        MappingId2*. FunLoc carries L2
+//                                        indices.
+//   L3  RuntimeSymbolLookup,           : (pid, raw addr) -> L2 index, owned
+//       DsoSymbolLookup,                 by SymbolHdr, populated by the
+//       MapInfoLookup,                   normal unwind path only.
+//       BaseFrameSymbolLookup,
+//       CommonSymbolLookup
+//   L4  LiveAllocation._restored_strings : backing storage for the three
+//                                        string_views in restored
+//                                        UnwindOutputs (container_id,
+//                                        exe_name, thread_name).
+//
+// On restore we re-intern through L1 (which correctly dedupes) and append
+// fresh L2 rows, but we never touch L3. Consequence: when the same
+// allocation site fires again after a restart via a natural sample, L3
+// misses and the normal path appends *another* L2 row pointing at the
+// same L1 handle. The resulting FunLoc has a different SymbolIdx_t /
+// MapInfoIdx_t than the restored one, so UnwindOutput::operator<=> treats
+// the two as distinct keys in LiveAllocation._unique_stacks. The exported
+// pprof is unaffected (libdatadog re-collapses via L1), but we carry up
+// to one duplicate aggregator entry per restored stack until natural
+// deallocations evict it.
+//
+// The clean fix is to make FunLoc identity content-based, keyed on the L1
+// handle pointers (function_id, mapping_id, ip, elf_addr) instead of L2
+// indices. That removes the duplication, lets restored and natural
+// UnwindOutputs collapse together, and would also let us drop the L2
+// indirection entirely for cold paths. It is a cross-cutting change
+// (unwind_helper, ddog_profiling_utils, pprof emission) and should be its
+// own PR.
 UnwindOutput portable_to_uo(const UnwindOutputPortable &p,
                             SymbolHdr &symbol_hdr, LiveAllocation &live_alloc) {
   const auto *dict = symbol_hdr.profiles_dictionary();
