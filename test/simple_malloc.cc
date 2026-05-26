@@ -4,6 +4,7 @@
 // Datadog, Inc.
 
 #include <alloca.h>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <csignal>
@@ -18,6 +19,7 @@
 #include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
+#include <utility>
 
 #include "clocks.hpp"
 #include "ddprof_base.hpp"
@@ -95,9 +97,60 @@ struct Options {
   bool use_shared_library = false;
   bool avoid_dlopen_hook = false;
   bool stop{false};
+  uint32_t unique_sites{0};
 };
 
 // NOLINTBEGIN(clang-analyzer-unix.Malloc)
+
+// One templated allocation site per Tag. Each instantiation has a distinct
+// mangled name, so the unwinder reports it as a distinct innermost frame —
+// useful for stress-testing the LiveAllocation snapshot path with many
+// unique stacks without rewriting the loop body. NOINLINE keeps the symbol
+// alive and the frame distinguishable.
+template <int Tag>
+DDPROF_NOINLINE void alloc_at_site(uint64_t size,
+                                   std::deque<void *> &live_allocations,
+                                   uint64_t keep_live,
+                                   uint32_t skip_free_target,
+                                   unsigned &skip_free_counter,
+                                   uint64_t &nb_alloc,
+                                   uint64_t &alloc_bytes) {
+  void *p = nullptr;
+  if (size) {
+    p = malloc(size);
+    ++nb_alloc;
+    alloc_bytes += size;
+  }
+  DoNotOptimize(p);
+  if (keep_live > 0) {
+    if (p != nullptr) {
+      live_allocations.push_back(p);
+      while (live_allocations.size() > keep_live) {
+        free(live_allocations.front());
+        live_allocations.pop_front();
+      }
+    }
+  } else {
+    if (skip_free_counter++ >= skip_free_target) {
+      free(p);
+      skip_free_counter = 0;
+    }
+  }
+}
+
+using AllocSiteFn = void (*)(uint64_t, std::deque<void *> &, uint64_t,
+                             uint32_t, unsigned &, uint64_t &, uint64_t &);
+
+template <std::size_t... Is>
+constexpr auto make_alloc_site_table(std::index_sequence<Is...>) {
+  return std::array<AllocSiteFn, sizeof...(Is)>{
+      &alloc_at_site<static_cast<int>(Is)>...};
+}
+
+constexpr std::size_t k_max_unique_alloc_sites = 256;
+constexpr auto k_alloc_site_table =
+    make_alloc_site_table(std::make_index_sequence<k_max_unique_alloc_sites>{});
+
 extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
                                                       Stats &stats) {
   uint64_t nb_alloc{0};
@@ -108,38 +161,50 @@ extern "C" DDPROF_NOINLINE void do_lot_of_allocations(const Options &options,
   auto start_cpu = ThreadCpuClock::now();
   unsigned skip_free = 0;
   std::deque<void *> live_allocations;
+  uint32_t const nb_sites = std::min<uint32_t>(
+      options.unique_sites, static_cast<uint32_t>(k_alloc_site_table.size()));
   for (uint64_t i = 0; i < options.loop_count; ++i) {
-    void *p = nullptr;
-    if (options.malloc_size) {
-      p = malloc(options.malloc_size);
-      ++nb_alloc;
-      alloc_bytes += options.malloc_size;
-    }
-    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
-    DoNotOptimize(p);
-    void *p2;
-    if (options.realloc_size) {
-      p2 = realloc(p, options.realloc_size);
-      ++nb_alloc;
-      alloc_bytes += options.realloc_size;
+    if (nb_sites > 0) {
+      // Pick a site deterministically by index; avoids the per-iteration
+      // cost of an RNG and still produces a uniform distribution.
+      std::size_t const site =
+          static_cast<std::size_t>((i * 2654435761ULL) % nb_sites);
+      k_alloc_site_table[site](options.malloc_size, live_allocations,
+                               options.keep_live_allocations, options.skip_free,
+                               skip_free, nb_alloc, alloc_bytes);
     } else {
-      p2 = p;
-    }
-    // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
-    DoNotOptimize(p2);
-
-    if (options.keep_live_allocations > 0) {
-      if (p2 != nullptr) {
-        live_allocations.push_back(p2);
-        while (live_allocations.size() > options.keep_live_allocations) {
-          free(live_allocations.front());
-          live_allocations.pop_front();
-        }
+      void *p = nullptr;
+      if (options.malloc_size) {
+        p = malloc(options.malloc_size);
+        ++nb_alloc;
+        alloc_bytes += options.malloc_size;
       }
-    } else {
-      if (skip_free++ >= options.skip_free) {
-        free(p2);
-        skip_free = 0;
+      // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
+      DoNotOptimize(p);
+      void *p2;
+      if (options.realloc_size) {
+        p2 = realloc(p, options.realloc_size);
+        ++nb_alloc;
+        alloc_bytes += options.realloc_size;
+      } else {
+        p2 = p;
+      }
+      // NOLINTNEXTLINE(clang-analyzer-unix.Malloc)
+      DoNotOptimize(p2);
+
+      if (options.keep_live_allocations > 0) {
+        if (p2 != nullptr) {
+          live_allocations.push_back(p2);
+          while (live_allocations.size() > options.keep_live_allocations) {
+            free(live_allocations.front());
+            live_allocations.pop_front();
+          }
+        }
+      } else {
+        if (skip_free++ >= options.skip_free) {
+          free(p2);
+          skip_free = 0;
+        }
       }
     }
 
@@ -309,6 +374,14 @@ int main(int argc, char *argv[]) {
     app.add_option("--keep-live", opts.keep_live_allocations,
                    "Keep the most recent N allocations alive to stabilize the "
                    "live heap size")
+        ->default_val(0)
+        ->check(CLI::NonNegativeNumber);
+    app.add_option(
+           "--unique-sites", opts.unique_sites,
+           "Spread allocations across N distinct templated call sites "
+           "(0 = single site, default). Used to stress-test profilers "
+           "with many distinct unwind outputs. Capped at the templated "
+           "table size (256).")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
 

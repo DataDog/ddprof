@@ -447,8 +447,28 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
       int const snap_fd =
           ctx.worker_ctx.persistent_worker_state->live_alloc_snapshot_fd;
       if (snap_fd >= 0 && context_allocation_profiling_watcher_idx(ctx) != -1) {
+        // Allow tests / debugging to override the snapshot budget without
+        // touching the CLI. Honored at every capture; capped at the hard
+        // ceiling defined in the snapshot module.
+        std::size_t max_bytes =
+            live_alloc_snapshot::k_default_max_snapshot_bytes;
+        if (const char *env = std::getenv(
+                "DD_PROFILING_NATIVE_LIVE_ALLOC_SNAPSHOT_MAX_BYTES")) {
+          char *end = nullptr;
+          unsigned long long const v = std::strtoull(env, &end, 10);
+          if (end != env && v > 0) {
+            max_bytes = std::min<std::size_t>(
+                static_cast<std::size_t>(v),
+                live_alloc_snapshot::k_hard_max_snapshot_bytes);
+          } else {
+            LG_WRN("[live-alloc] Invalid "
+                   "DD_PROFILING_NATIVE_LIVE_ALLOC_SNAPSHOT_MAX_BYTES=%s",
+                   env);
+          }
+        }
         auto snap = live_alloc_snapshot::capture_snapshot(
-            ctx.worker_ctx.live_allocation, ctx.worker_ctx.us->symbol_hdr);
+            ctx.worker_ctx.live_allocation, ctx.worker_ctx.us->symbol_hdr,
+            max_bytes);
         if (!live_alloc_snapshot::write_to_fd(snap_fd, snap)) {
           LG_WRN("[live-alloc] Failed to write snapshot before restart");
         } else {
