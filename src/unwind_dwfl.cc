@@ -100,16 +100,26 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       add_error_frame(nullptr, us, pc, SymbolErrors::unknown_mapping);
       return {};
     }
-    const Dso &dso = find_res.first->second;
-    std::string_view jitdump_path = {};
-    if (has_runtime_symbols(dso)) {
+    if (has_runtime_symbols(find_res.first->second)) {
       // The JITDump mmap event may not yet have been processed (startup race),
       // or an earlier backpopulate may have observed /proc/maps before the
       // runtime published the JITDump. Force a one-shot rescan per cycle to
       // recover it before falling back to the perf-map path.
+      // Note: try_jitdump_discovery() may mutate pid_mapping._map, which
+      // invalidates iterators / references into it. Re-find after the call
+      // and bail if the mapping covering `pc` no longer qualifies.
       if (!pid_mapping._jitdump_addr) {
         dsoHdr.try_jitdump_discovery(pid_mapping, us->pid);
+        find_res = DsoHdr::dso_find_closest(pid_mapping._map, pc);
+        if (!find_res.second || !has_runtime_symbols(find_res.first->second)) {
+          LG_DBG("[UW] (PID%d) DSO at 0x%lx invalidated by JITDump discovery",
+                 us->pid, pc);
+          add_error_frame(nullptr, us, pc, SymbolErrors::unknown_mapping);
+          return {};
+        }
       }
+      const Dso &dso = find_res.first->second;
+      std::string_view jitdump_path = {};
       if (pid_mapping._jitdump_addr) {
         DsoHdr::DsoFindRes const find_mapping = DsoHdr::dso_find_closest(
             pid_mapping._map, pid_mapping._jitdump_addr);
@@ -119,6 +129,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       }
       return add_runtime_symbol_frame(us, dso, pc, jitdump_path);
     }
+    const Dso &dso = find_res.first->second;
     // if not encountered previously, update file location / key
     file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
     if (file_info_id <= k_file_info_error) {

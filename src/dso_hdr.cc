@@ -601,16 +601,18 @@ bool DsoHdr::try_jitdump_discovery(PidMapping &pid_mapping, pid_t pid) {
   // Force a /proc/<pid>/maps rescan, bypassing the usual permission gate.
   // The runtime may have published a JITDump file after the previous
   // backpopulate, or its mmap event may have been missed.
+  // Note: pid_backpopulate may mutate pid_mapping._map via
+  // insert_erase_overlap / erase_range, so any DSO reference held by the
+  // caller across this call must be considered invalidated.
   BackpopulatePermission const saved_perm =
       pid_mapping._backpopulate_state.perm;
   pid_mapping._backpopulate_state.perm = kAllowed;
   int nb_elts_added = 0;
   pid_backpopulate(pid_mapping, pid, nb_elts_added);
-  // Preserve the original permission if backpopulate flipped it to forbidden
-  // for unrelated reasons; we only wanted a one-shot rescan here.
-  if (saved_perm == kAllowed) {
-    pid_mapping._backpopulate_state.perm = kAllowed;
-  }
+  // Always restore the saved permission: this is a one-shot probe; we don't
+  // want a forced scan that added unrelated mappings to leave the gate open
+  // and bypass the normal throttle for subsequent unknown PCs.
+  pid_mapping._backpopulate_state.perm = saved_perm;
   return pid_mapping._jitdump_addr != 0;
 }
 
