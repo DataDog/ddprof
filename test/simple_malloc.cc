@@ -108,13 +108,11 @@ struct Options {
 // unique stacks without rewriting the loop body. NOINLINE keeps the symbol
 // alive and the frame distinguishable.
 template <int Tag>
-DDPROF_NOINLINE void alloc_at_site(uint64_t size,
-                                   std::deque<void *> &live_allocations,
-                                   uint64_t keep_live,
-                                   uint32_t skip_free_target,
-                                   unsigned &skip_free_counter,
-                                   uint64_t &nb_alloc,
-                                   uint64_t &alloc_bytes) {
+DDPROF_NOINLINE void
+alloc_at_site(uint64_t size, std::deque<void *> &live_allocations,
+              uint64_t keep_live, uint32_t skip_free_target,
+              unsigned &skip_free_counter, uint64_t &nb_alloc,
+              uint64_t &alloc_bytes) {
   void *p = nullptr;
   if (size) {
     p = malloc(size);
@@ -138,8 +136,8 @@ DDPROF_NOINLINE void alloc_at_site(uint64_t size,
   }
 }
 
-using AllocSiteFn = void (*)(uint64_t, std::deque<void *> &, uint64_t,
-                             uint32_t, unsigned &, uint64_t &, uint64_t &);
+using AllocSiteFn = void (*)(uint64_t, std::deque<void *> &, uint64_t, uint32_t,
+                             unsigned &, uint64_t &, uint64_t &);
 
 template <std::size_t... Is>
 constexpr auto make_alloc_site_table(std::index_sequence<Is...>) {
@@ -376,12 +374,11 @@ int main(int argc, char *argv[]) {
                    "live heap size")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
-    app.add_option(
-           "--unique-sites", opts.unique_sites,
-           "Spread allocations across N distinct templated call sites "
-           "(0 = single site, default). Used to stress-test profilers "
-           "with many distinct unwind outputs. Capped at the templated "
-           "table size (256).")
+    app.add_option("--unique-sites", opts.unique_sites,
+                   "Spread allocations across N distinct templated call sites "
+                   "(0 = single site, default). Used to stress-test profilers "
+                   "with many distinct unwind outputs. Capped at the templated "
+                   "table size (256).")
         ->default_val(0)
         ->check(CLI::NonNegativeNumber);
 
