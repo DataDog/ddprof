@@ -103,6 +103,13 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     const Dso &dso = find_res.first->second;
     std::string_view jitdump_path = {};
     if (has_runtime_symbols(dso)) {
+      // The JITDump mmap event may not yet have been processed (startup race),
+      // or an earlier backpopulate may have observed /proc/maps before the
+      // runtime published the JITDump. Force a one-shot rescan per cycle to
+      // recover it before falling back to the perf-map path.
+      if (!pid_mapping._jitdump_addr) {
+        dsoHdr.try_jitdump_discovery(pid_mapping, us->pid);
+      }
       if (pid_mapping._jitdump_addr) {
         DsoHdr::DsoFindRes const find_mapping = DsoHdr::dso_find_closest(
             pid_mapping._map, pid_mapping._jitdump_addr);

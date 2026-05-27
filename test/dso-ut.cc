@@ -442,6 +442,33 @@ TEST(DSOTest, insert_jitdump) {
   EXPECT_EQ(start, pid_mapping._jitdump_addr);
 }
 
+// Regression test: a JITDump mmap event whose timestamp predates the last
+// backpopulate must still be accepted (otherwise we lose the JITDump marker
+// in startup-race scenarios with JIT runtimes such as Julia / .NET).
+TEST(DSOTest, jitdump_bypasses_backpopulate_timestamp) {
+  PerfClock::init();
+  DsoHdr dso_hdr;
+  pid_t const test_pid = 3237589;
+  Dso jitdump_dso = DsoHdr::dso_from_proc_line(test_pid, s_jitdump_line);
+  ASSERT_EQ(jitdump_dso._type, DsoType::kJITDump);
+  ProcessAddress_t const start = jitdump_dso._start;
+
+  // Simulate a previous backpopulate that observed /proc/maps before the
+  // runtime published the JITDump file.
+  auto &pid_mapping = dso_hdr.get_pid_mapping(test_pid);
+  pid_mapping._backpopulate_state.last_backpopulate_time = PerfClock::now();
+
+  // The buffered perf MMAP2 event for the JITDump file has an older timestamp.
+  PerfClock::time_point const old_timestamp{};
+  ASSERT_LT(old_timestamp,
+            pid_mapping._backpopulate_state.last_backpopulate_time);
+
+  bool const inserted =
+      dso_hdr.maybe_insert_erase_overlap(std::move(jitdump_dso), old_timestamp);
+  EXPECT_TRUE(inserted);
+  EXPECT_EQ(start, pid_mapping._jitdump_addr);
+}
+
 TEST(DSOTest, exe_name) {
   ElfAddress_t ip = _THIS_IP_;
   DsoHdr dso_hdr;
