@@ -101,10 +101,13 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
       return {};
     }
     if (has_runtime_symbols(find_res.first->second)) {
-      // The JITDump mmap event may not yet have been processed (startup race),
-      // or an earlier backpopulate may have observed /proc/maps before the
-      // runtime published the JITDump. Force a one-shot rescan per cycle to
-      // recover it before falling back to the perf-map path.
+      // The JITDump mmap event may not yet have been processed (startup
+      // race): a sample can land in a JIT'd region before the MMAP2 for the
+      // JITDump file has been consumed from the ring buffer. If no /proc
+      // scan has ever run for this pid, do one now to discover the JITDump
+      // before falling back to the perf-map path. After any backpopulate,
+      // late JITDump events are picked up by the kJITDump bypass in
+      // maybe_insert_erase_overlap, so this rescan is a no-op.
       // Note: try_jitdump_discovery() may mutate pid_mapping._map, which
       // invalidates iterators / references into it. Re-find after the call
       // and bail if the mapping covering `pc` no longer qualifies.

@@ -99,9 +99,6 @@ public:
     BackpopulateState _backpopulate_state;
     // save the start addr of the jit dump info if available
     ProcessAddress_t _jitdump_addr = {};
-    // True if we already tried to discover a JITDump file for this pid
-    // during the current cycle (cleared by reset_backpopulate_state).
-    bool _jitdump_discovery_attempted = false;
   };
   using DsoPidMap = std::unordered_map<pid_t, PidMapping>;
 
@@ -150,11 +147,14 @@ public:
                                       ElfAddress_t addr);
   DsoFindRes dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr);
 
-  // Attempt to discover a JITDump file for a pid by rescanning
-  // /proc/<pid>/maps. This is used to recover from startup races where the
-  // JITDump mmap event arrived too late or was missed by an earlier
-  // backpopulate. Throttled to at most one attempt per cycle per pid. Returns
-  // true if a JITDump file is known for this pid after the call.
+  // Attempt to discover a JITDump file for a pid by scanning
+  // /proc/<pid>/maps. Used to recover from the startup race where a sample
+  // lands in a JIT'd region before the JITDump perf MMAP2 event has been
+  // consumed from the ring buffer. Only fires when no full /proc scan has
+  // ever run for this pid (`last_backpopulate_time` is zero); after any
+  // backpopulate, late JITDump events are handled by the kJITDump bypass
+  // in maybe_insert_erase_overlap, so an extra rescan is not needed.
+  // Returns true if a JITDump file is known for this pid after the call.
   bool try_jitdump_discovery(PidMapping &pid_mapping, pid_t pid);
 
   void reset_backpopulate_state(

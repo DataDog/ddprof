@@ -583,9 +583,6 @@ void DsoHdr::reset_backpopulate_state(int reset_threshold) {
     if (backpopulate_state.nb_unfound_dsos >= reset_threshold) {
       backpopulate_state = {};
     }
-    // Allow another JITDump discovery attempt next cycle, regardless of
-    // backpopulate threshold (cheap once-per-cycle /proc/maps rescan).
-    pid_mapping._jitdump_discovery_attempted = false;
   }
 }
 
@@ -593,26 +590,20 @@ bool DsoHdr::try_jitdump_discovery(PidMapping &pid_mapping, pid_t pid) {
   if (pid_mapping._jitdump_addr) {
     return true;
   }
-  if (pid_mapping._jitdump_discovery_attempted) {
+  // Only run when /proc/<pid>/maps has never been scanned for this pid.
+  // Once any backpopulate has run, late-arriving JITDump perf events are
+  // already handled by the kJITDump bypass in maybe_insert_erase_overlap,
+  // so an extra rescan would just be redundant work.
+  if (pid_mapping._backpopulate_state.last_backpopulate_time !=
+      PerfClock::time_point{}) {
     return false;
   }
-  pid_mapping._jitdump_discovery_attempted = true;
 
-  // Force a /proc/<pid>/maps rescan, bypassing the usual permission gate.
-  // The runtime may have published a JITDump file after the previous
-  // backpopulate, or its mmap event may have been missed.
-  // Note: pid_backpopulate may mutate pid_mapping._map via
-  // insert_erase_overlap / erase_range, so any DSO reference held by the
-  // caller across this call must be considered invalidated.
-  BackpopulatePermission const saved_perm =
-      pid_mapping._backpopulate_state.perm;
-  pid_mapping._backpopulate_state.perm = kAllowed;
+  // pid_backpopulate may mutate pid_mapping._map via insert_erase_overlap /
+  // erase_range; callers must invalidate any DSO reference held across this
+  // call.
   int nb_elts_added = 0;
   pid_backpopulate(pid_mapping, pid, nb_elts_added);
-  // Always restore the saved permission: this is a one-shot probe; we don't
-  // want a forced scan that added unrelated mappings to leave the gate open
-  // and bypass the normal throttle for subsequent unknown PCs.
-  pid_mapping._backpopulate_state.perm = saved_perm;
   return pid_mapping._jitdump_addr != 0;
 }
 
