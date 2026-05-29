@@ -19,6 +19,7 @@
 
 #include <algorithm>
 #include <array>
+#include <elfutils/libdwfl.h>
 
 namespace ddprof {
 
@@ -48,6 +49,43 @@ void add_exe_name(UnwindState *us) {
 
 void add_thread_name(Process &process, UnwindState *us) {
   us->output.thread_name = process.get_or_insert_thread_name(us->output.tid);
+}
+
+// Resolve the main executable's Elf* via libdwfl. Returns nullptr if the
+// main-exe module is not registered yet for this PID (e.g. very first sample,
+// or unwinding never crossed the main exe).
+Elf *get_main_exe_elf(UnwindState *us) {
+  if (us->_dwfl_wrapper == nullptr) {
+    return nullptr;
+  }
+  const DsoHdr::DsoFindRes find_res =
+      us->dso_hdr.dso_find_first_std_executable(us->pid);
+  if (!find_res.second) {
+    return nullptr;
+  }
+  const Dso &dso = find_res.first->second;
+  const FileInfoId_t file_info_id = us->dso_hdr.get_or_insert_file_info(dso);
+  if (file_info_id <= k_file_info_error) {
+    return nullptr;
+  }
+  DDProfMod *mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
+  if (mod == nullptr || mod->_mod == nullptr) {
+    return nullptr;
+  }
+  Dwarf_Addr bias = 0;
+  // dwfl_module_getelf returns the Elf* libdwfl already opened for this
+  // module (cached). No extra file open on our side.
+  return dwfl_module_getelf(mod->_mod, &bias);
+}
+
+void add_process_language(Process &process, UnwindState *us) {
+  if (!process.detect_language_once(get_main_exe_elf(us))) {
+    // Detection deferred (no Elf* yet) -- try again next sample.
+  }
+  const NativeLanguage lang = process.get_language();
+  if (lang != NativeLanguage::kUnknown) {
+    us->output.language = to_string(lang);
+  }
 }
 } // namespace
 
@@ -96,6 +134,7 @@ DDRes unwindstate_unwind(UnwindState *us) {
   // Add a frame that identifies executable to which these belong
   add_virtual_base_frame(us);
   add_container_id(process, us);
+  add_process_language(process, us);
   if (us->is_timeline) {
     // the lookup is only useful in timeline view
     // keep this as a way to remove the possible overhead of opening the files

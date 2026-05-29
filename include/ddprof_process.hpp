@@ -10,6 +10,12 @@
 #include "ddres_def.hpp"
 #include "dwfl_wrapper.hpp"
 #include "logger.hpp"
+#include "native_language.hpp"
+
+// libelf forward declaration
+extern "C" {
+struct Elf;
+}
 
 #include <limits>
 #include <memory>
@@ -40,6 +46,19 @@ public:
 
   [[nodiscard]] std::string_view get_or_insert_thread_name(pid_t tid);
 
+  // Cached native language of the process' main executable.
+  // Returns kUnknown until populated by set_language().
+  NativeLanguage get_language() const { return _language; }
+
+  // Detect (only once) the language using an already-opened Elf* (typically
+  // libdwfl's main-module Elf*). No-op on subsequent calls.
+  // Returns true if detection was attempted on this call.
+  bool detect_language_once(::Elf *main_exe_elf);
+
+  // Fallback path: detect by opening /proc/<pid>/exe ourselves. Use only when
+  // no Elf* is available yet.
+  bool detect_language_once_from_proc(std::string_view path_to_proc);
+
   [[nodiscard]] DwflWrapper *get_or_insert_dwfl();
   [[nodiscard]] DwflWrapper *get_dwfl();
   [[nodiscard]] const DwflWrapper *get_dwfl() const;
@@ -57,6 +76,8 @@ private:
   pid_t _pid;
   CGroupId_t _cgroup_ns;
   uint64_t _sample_counter{};
+  NativeLanguage _language{NativeLanguage::kUnknown};
+  bool _language_detected{false};
 };
 
 class ProcessHdr {
@@ -66,6 +87,7 @@ public:
   void flag_visited(pid_t pid);
   Process &get(pid_t pid);
   const ContainerId &get_container_id(pid_t pid);
+
   void clear(pid_t pid) { _process_map.erase(pid); }
 
   std::vector<pid_t> get_unvisited() const;
