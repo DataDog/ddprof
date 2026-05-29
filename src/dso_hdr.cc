@@ -357,11 +357,21 @@ bool DsoHdr::maybe_insert_erase_overlap(Dso &&dso,
                                         PerfClock::time_point timestamp) {
   auto &pid_mapping = _pid_map[dso._pid];
 
+  // JITDump mmap events are idempotent (insert_erase_overlap dedupes via
+  // dso_find_adjust_same) and the marker is required to symbolize JIT frames.
+  // Always accept them, even if their timestamp predates the last backpopulate:
+  // this fixes a startup race where a backpopulate triggered by an early sample
+  // observes /proc/<pid>/maps before the runtime has mmap'd the JITDump file,
+  // and the subsequent perf MMAP2 event (with an older timestamp) would
+  // otherwise be silently dropped.
+  const bool is_jitdump = dso._type == DsoType::kJITDump;
+
   // If mmap event happened earlier than last backpopulate, just ignore it
   // Note that if no perf clock was found or not backpopulate was done,
   // last_backpopulate_time will be zero and therefore test will correctly
   // fail.
-  if (timestamp < pid_mapping._backpopulate_state.last_backpopulate_time) {
+  if (!is_jitdump &&
+      timestamp < pid_mapping._backpopulate_state.last_backpopulate_time) {
     return false;
   }
 
@@ -574,6 +584,27 @@ void DsoHdr::reset_backpopulate_state(int reset_threshold) {
       backpopulate_state = {};
     }
   }
+}
+
+bool DsoHdr::try_jitdump_discovery(PidMapping &pid_mapping, pid_t pid) {
+  if (pid_mapping._jitdump_addr) {
+    return true;
+  }
+  // Only run when /proc/<pid>/maps has never been scanned for this pid.
+  // Once any backpopulate has run, late-arriving JITDump perf events are
+  // already handled by the kJITDump bypass in maybe_insert_erase_overlap,
+  // so an extra rescan would just be redundant work.
+  if (pid_mapping._backpopulate_state.last_backpopulate_time !=
+      PerfClock::time_point{}) {
+    return false;
+  }
+
+  // pid_backpopulate may mutate pid_mapping._map via insert_erase_overlap /
+  // erase_range; callers must invalidate any DSO reference held across this
+  // call.
+  int nb_elts_added = 0;
+  pid_backpopulate(pid_mapping, pid, nb_elts_added);
+  return pid_mapping._jitdump_addr != 0;
 }
 
 void DsoHdr::pid_fork(pid_t child_pid, pid_t parent_pid) {

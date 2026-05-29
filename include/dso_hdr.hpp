@@ -147,6 +147,16 @@ public:
                                       ElfAddress_t addr);
   DsoFindRes dso_find_or_backpopulate(pid_t pid, ElfAddress_t addr);
 
+  // Attempt to discover a JITDump file for a pid by scanning
+  // /proc/<pid>/maps. Used to recover from the startup race where a sample
+  // lands in a JIT'd region before the JITDump perf MMAP2 event has been
+  // consumed from the ring buffer. Only fires when no full /proc scan has
+  // ever run for this pid (`last_backpopulate_time` is zero); after any
+  // backpopulate, late JITDump events are handled by the kJITDump bypass
+  // in maybe_insert_erase_overlap, so an extra rescan is not needed.
+  // Returns true if a JITDump file is known for this pid after the call.
+  bool try_jitdump_discovery(PidMapping &pid_mapping, pid_t pid);
+
   void reset_backpopulate_state(
       int reset_threshold =
           BackpopulateState::k_nb_requests_between_backpopulates);
