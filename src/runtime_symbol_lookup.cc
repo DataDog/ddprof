@@ -10,6 +10,7 @@
 #include "defer.hpp"
 #include "jit/jitdump.hpp"
 #include "logger.hpp"
+#include "procutils.hpp"
 #include "unlikely.hpp"
 
 #include <absl/strings/substitute.h>
@@ -170,28 +171,107 @@ DDRes RuntimeSymbolLookup::fill_from_perfmap(
   return {};
 }
 
+bool RuntimeSymbolLookup::stat_jitdump(pid_t pid, std::string_view jitdump_path,
+                                       int64_t *size, inode_t *inode) const {
+  // The path advertised by perf for the jitdump mapping is observed from
+  // inside the target's mount namespace. When ddprof runs in a different
+  // namespace (typically the host, with the target in a container) that
+  // raw path is not directly reachable. Resolve it the same way
+  // fill_from_jitdump does so growth checks see the same file the parser
+  // would actually read:
+  //   - absolute path -> reach via /proc/<pid>/root/<path>
+  //   - relative path -> reach via /proc/<pid>/cwd/<path>
+  //   - if neither works (e.g. ddprof runs in the same namespace as the
+  //     target) fall back to the raw path.
+  const std::string proc_path = is_absolute_path(jitdump_path)
+      ? absl::Substitute("$0/proc/$1/root$2", _path_to_proc, pid, jitdump_path)
+      : absl::Substitute("$0/proc/$1/cwd/$2", _path_to_proc, pid, jitdump_path);
+
+  if (get_file_inode(proc_path.c_str(), inode, size)) {
+    return true;
+  }
+  const std::string fallback(jitdump_path);
+  return get_file_inode(fallback.c_str(), inode, size);
+}
+
+bool RuntimeSymbolLookup::check_jitdump_changed(SymbolInfo &symbol_info,
+                                                pid_t pid,
+                                                std::string_view jitdump_path) {
+  auto [retry_it, inserted] =
+      symbol_info._jitdump_retry.try_emplace(std::string(jitdump_path));
+  JitdumpRetryState &retry = retry_it->second;
+  if (++retry.misses_since_check < k_jitdump_retry_check_every) {
+    return false;
+  }
+  retry.misses_since_check = 0;
+  int64_t size = 0;
+  inode_t inode = 0;
+  if (!stat_jitdump(pid, jitdump_path, &size, &inode)) {
+    // Path is currently unreachable (e.g. //anon). Keep the freeze
+    // without churning; next cycle naturally retries.
+    return false;
+  }
+  if (size == retry.size_bytes && inode == retry.inode) {
+    return false;
+  }
+  retry.size_bytes = size;
+  retry.inode = inode;
+  return true;
+}
+
+DDRes RuntimeSymbolLookup::read_jitdump(
+    SymbolInfo &symbol_info, pid_t pid, std::string_view jitdump_path,
+    SymbolTable &symbol_table, const ddog_prof_ProfilesDictionary *dict) {
+  ++_stats._nb_jit_reads;
+  DDRes res = fill_from_jitdump(jitdump_path, pid, symbol_info._map,
+                                symbol_table, dict);
+  if (IsDDResFatal(res)) {
+    return res;
+  }
+  // Refresh the cached size/inode so subsequent retries only fire on growth.
+  auto [retry_it, inserted] =
+      symbol_info._jitdump_retry.try_emplace(std::string(jitdump_path));
+  stat_jitdump(pid, jitdump_path, &retry_it->second.size_bytes,
+               &retry_it->second.inode);
+  retry_it->second.misses_since_check = 0;
+  return res;
+}
+
 SymbolIdx_t RuntimeSymbolLookup::get_or_insert_jitdump(
     pid_t pid, ProcessAddress_t pc, SymbolTable &symbol_table,
     const ddog_prof_ProfilesDictionary *dict, std::string_view jitdump_path) {
   SymbolInfo &symbol_info = _pid_map[pid];
   SymbolMap::FindRes find_res = symbol_info._map.find_closest(pc);
-  if (!find_res.second && !has_lookup_failure(symbol_info, jitdump_path)) {
-    // refresh as we expect there to be new symbols
-    ++_stats._nb_jit_reads;
-    if (IsDDResFatal(fill_from_jitdump(jitdump_path, pid, symbol_info._map,
-                                       symbol_table, dict))) {
-      // Some warnings can be expected with incomplete files
+  if (find_res.second) {
+    return find_res.first->second.get_symbol_idx();
+  }
+
+  // Two reasons to (re)read the file:
+  //   1. We have never read it (or we did, but a new cycle has cleared the
+  //      previous failure flag).
+  //   2. We've already given up this cycle, but a periodic stat shows the
+  //      file has grown or been replaced since the last read.
+  const bool first_attempt = !has_lookup_failure(symbol_info, jitdump_path);
+  const bool should_read =
+      first_attempt || check_jitdump_changed(symbol_info, pid, jitdump_path);
+
+  if (should_read) {
+    if (IsDDResFatal(
+            read_jitdump(symbol_info, pid, jitdump_path, symbol_table, dict))) {
+      // Some warnings can be expected with incomplete files.
       flag_lookup_failure(symbol_info, jitdump_path);
       return -1;
     }
     find_res = symbol_info._map.find_closest(pc);
   }
-  // Avoid bouncing when we are failing lookups.
-  // !This could have a negative impact on symbolisation. To be studied
+
+  // Soft miss (or hard miss with no read attempted): freeze for the cycle.
+  // !This could have a negative impact on symbolisation. To be studied.
   if (!find_res.second) {
     flag_lookup_failure(symbol_info, jitdump_path);
+    return -1;
   }
-  return find_res.second ? find_res.first->second.get_symbol_idx() : -1;
+  return find_res.first->second.get_symbol_idx();
 }
 
 SymbolIdx_t

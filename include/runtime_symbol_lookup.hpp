@@ -58,9 +58,20 @@ public:
 private:
   using FailedCycle = HeterogeneousLookupStringMap<uint32_t>;
 
+  // Per-(pid, jitdump path) state used to decide when to retry a jitdump
+  // read after a soft miss (file readable, but the sampled PC was not in
+  // the records we already ingested). See get_or_insert_jitdump.
+  struct JitdumpRetryState {
+    int64_t size_bytes = 0;
+    inode_t inode = 0;
+    uint32_t misses_since_check = 0;
+  };
+  using JitdumpRetryMap = HeterogeneousLookupStringMap<JitdumpRetryState>;
+
   struct SymbolInfo {
     SymbolMap _map;
     FailedCycle _failed_cycle;
+    JitdumpRetryMap _jitdump_retry;
   };
   using PidUnorderedMap = std::unordered_map<pid_t, SymbolInfo>;
 
@@ -84,6 +95,25 @@ private:
                           SymbolMap &symbol_map, SymbolTable &symbol_table,
                           const ddog_prof_ProfilesDictionary *dict);
 
+  // Best-effort stat of the jitdump file using the same candidate paths
+  // as fill_from_jitdump. Returns true on success and fills *size and
+  // *inode. Returns false if no candidate path was stat-able.
+  bool stat_jitdump(pid_t pid, std::string_view jitdump_path, int64_t *size,
+                    inode_t *inode) const;
+
+  // Counter-gated stat to detect that the jitdump file has changed
+  // (grown or been replaced) since the last read. Returns true when a
+  // change is observed, in which case the retry state is updated to the
+  // freshly-observed size/inode so the change is not reported twice.
+  bool check_jitdump_changed(SymbolInfo &symbol_info, pid_t pid,
+                             std::string_view jitdump_path);
+
+  // Parse the jitdump file and refresh the retry-state book-keeping so
+  // subsequent retries only fire when the file changes again.
+  DDRes read_jitdump(SymbolInfo &symbol_info, pid_t pid,
+                     std::string_view jitdump_path, SymbolTable &symbol_table,
+                     const ddog_prof_ProfilesDictionary *dict);
+
   DDRes fill_from_perfmap(int pid, SymbolMap &symbol_map,
                           SymbolTable &symbol_table,
                           const ddog_prof_ProfilesDictionary *dict);
@@ -100,6 +130,30 @@ private:
     return false;
   }
 
+  // Soft-miss retry budget: a soft miss flags the (pid, path) pair as
+  // "already tried this cycle" so we don't reparse the jitdump for every
+  // subsequent missed PC. Without any retry mechanism however, a single
+  // unlucky first sample (e.g. fired while Julia was still flushing
+  // jit-<pid>.dump) leaves the whole cycle with 0 symbolized JIT frames.
+  //
+  // To recover, every k_jitdump_retry_check_every soft misses we stat the
+  // jitdump file. If it has grown / been replaced since the last read we
+  // unfreeze and reparse; otherwise we keep the freeze cheaply.
+  //
+  // Cost note: with 99 Hz CPU sampling on up to ~20 cores, the worst case
+  // (every sample misses) is ~99 * 20 / 64 ~= 30 stat() calls per second
+  // for the whole profiler. In practice the JIT map hits dominate and
+  // stat is invoked far less.
+  static constexpr uint32_t k_jitdump_retry_check_every = 64;
+
+  // Exposed for unit tests so tests can validate the retry budget without
+  // having to perform thousands of lookups.
+public:
+  static constexpr uint32_t jitdump_retry_check_every() {
+    return k_jitdump_retry_check_every;
+  }
+
+private:
   void flag_lookup_failure(SymbolInfo &symbol_info, std::string_view path) {
     const auto it = symbol_info._failed_cycle.find(path);
     // Written this way, we save up on creating strings
