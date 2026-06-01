@@ -11,8 +11,12 @@
 #include "symbol_hdr.hpp"
 #include "symbol_table.hpp"
 
+#include <cstdio>
 #include <datadog/profiling.h>
+#include <filesystem>
+#include <fstream>
 #include <string>
+#include <unistd.h>
 
 namespace ddprof {
 
@@ -239,6 +243,126 @@ TEST(runtime_symbol_lookup, jitdump_vs_perfmap) {
         runtime_symbol_lookup_perfmap.get_stats();
     EXPECT_EQ(stats._symbol_count, 11605);
   }
+}
+
+namespace {
+// Copy `src` into `dst`, truncating/replacing. Returns false on I/O error.
+bool copy_file_replace(const std::string &src, const std::string &dst) {
+  std::error_code ec;
+  std::filesystem::copy_file(
+      src, dst, std::filesystem::copy_options::overwrite_existing, ec);
+  return !ec;
+}
+
+// Test fixture for jitdump growth-retry behaviour.
+class JitdumpRetry : public ::testing::Test {
+protected:
+  void SetUp() override {
+    // Unique per-test tempfile we can grow / replace.
+    char tmpl[] = "/tmp/ddprof-jitdump-retry-XXXXXX";
+    int fd = ::mkstemp(tmpl);
+    ASSERT_GE(fd, 0);
+    ::close(fd);
+    _tmp_path = tmpl;
+    _partial = std::string(UNIT_TEST_DATA) + "/jit-julia-partial.dump";
+    _full = std::string(UNIT_TEST_DATA) + "/jit-simple-julia.dump";
+    // The PC matching `julia_b_11` in `_full`.
+    _matching_pc = 0x7bea23b00390;
+  }
+  void TearDown() override {
+    std::error_code ec;
+    std::filesystem::remove(_tmp_path, ec);
+  }
+
+  std::string _tmp_path;
+  std::string _partial;
+  std::string _full;
+  ProcessAddress_t _matching_pc;
+};
+} // namespace
+
+TEST_F(JitdumpRetry, no_growth_does_not_reread) {
+  SymbolHdr symbol_hdr;
+  SymbolTable symbol_table;
+  ASSERT_TRUE(copy_file_replace(_partial, _tmp_path));
+
+  RuntimeSymbolLookup lookup("");
+  pid_t mypid = getpid();
+
+  // First call: reads partial file, PC not present, freezes the path.
+  EXPECT_EQ(lookup.get_or_insert_jitdump(mypid, _matching_pc, symbol_table,
+                                         symbol_hdr.profiles_dictionary(),
+                                         _tmp_path),
+            -1);
+  EXPECT_EQ(lookup.get_stats()._nb_jit_reads, 1U);
+
+  // Without growth, every retry tick observes the same (size, inode) and
+  // does NOT trigger another read.
+  const uint32_t budget = RuntimeSymbolLookup::jitdump_retry_check_every();
+  for (uint32_t i = 0; i < 4U * budget; ++i) {
+    lookup.get_or_insert_jitdump(mypid, _matching_pc, symbol_table,
+                                 symbol_hdr.profiles_dictionary(), _tmp_path);
+  }
+  EXPECT_EQ(lookup.get_stats()._nb_jit_reads, 1U);
+}
+
+TEST_F(JitdumpRetry, growth_triggers_reread_and_resolves_pc) {
+  SymbolHdr symbol_hdr;
+  SymbolTable symbol_table;
+  ASSERT_TRUE(copy_file_replace(_partial, _tmp_path));
+
+  RuntimeSymbolLookup lookup("");
+  pid_t mypid = getpid();
+
+  // First read: partial file, PC misses → frozen.
+  ASSERT_EQ(lookup.get_or_insert_jitdump(mypid, _matching_pc, symbol_table,
+                                         symbol_hdr.profiles_dictionary(),
+                                         _tmp_path),
+            -1);
+  ASSERT_EQ(lookup.get_stats()._nb_jit_reads, 1U);
+
+  // Burn the retry budget while the file is unchanged: no extra reads.
+  const uint32_t budget = RuntimeSymbolLookup::jitdump_retry_check_every();
+  for (uint32_t i = 1; i < budget; ++i) {
+    lookup.get_or_insert_jitdump(mypid, _matching_pc, symbol_table,
+                                 symbol_hdr.profiles_dictionary(), _tmp_path);
+  }
+  EXPECT_EQ(lookup.get_stats()._nb_jit_reads, 1U);
+
+  // Replace the file with a fuller jitdump that contains the PC.
+  ASSERT_TRUE(copy_file_replace(_full, _tmp_path));
+
+  // The next missed lookup should hit the stat tick, observe the change,
+  // reparse the file, and resolve the PC.
+  SymbolIdx_t idx =
+      lookup.get_or_insert_jitdump(mypid, _matching_pc, symbol_table,
+                                   symbol_hdr.profiles_dictionary(), _tmp_path);
+  EXPECT_NE(idx, -1);
+  EXPECT_EQ(lookup.get_stats()._nb_jit_reads, 2U);
+}
+
+TEST_F(JitdumpRetry, unreachable_path_does_not_churn) {
+  // "//anon" reproduces the path-resolution pathology observed in CI:
+  // the jitdump DSO ended up tagged with a placeholder filename. stat()
+  // fails on every retry tick; we must not loop on reads.
+  SymbolHdr symbol_hdr;
+  SymbolTable symbol_table;
+  RuntimeSymbolLookup lookup("");
+  pid_t mypid = getpid();
+  const std::string bogus = "//anon";
+
+  EXPECT_EQ(lookup.get_or_insert_jitdump(mypid, 0xbadbeef, symbol_table,
+                                         symbol_hdr.profiles_dictionary(),
+                                         bogus),
+            -1);
+  const uint32_t initial_reads = lookup.get_stats()._nb_jit_reads;
+
+  const uint32_t budget = RuntimeSymbolLookup::jitdump_retry_check_every();
+  for (uint32_t i = 0; i < 4U * budget; ++i) {
+    lookup.get_or_insert_jitdump(mypid, 0xbadbeef, symbol_table,
+                                 symbol_hdr.profiles_dictionary(), bogus);
+  }
+  EXPECT_EQ(lookup.get_stats()._nb_jit_reads, initial_reads);
 }
 
 } // namespace ddprof

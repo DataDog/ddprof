@@ -374,6 +374,7 @@ add_unit_test(
   ../src/demangler/demangler.cc
   ../src/symbol_map.cc
   ../src/jit/jitdump.cc
+  ../src/procutils.cc
   LIBRARIES Datadog::Profiling llvm-demangle)
 
 add_unit_test(ddprof_cpumask-ut ddprof_cpumask-ut.cc ../src/ddprof_cpumask.cc)
