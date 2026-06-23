@@ -41,7 +41,9 @@ DDPROF_WEAK void sdallocx(void *ptr, size_t size, int flags);
 }
 #endif
 #include <malloc.h>
+#include <sys/ipc.h>
 #include <sys/mman.h>
+#include <sys/shm.h>
 #include <unistd.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
@@ -61,6 +63,10 @@ DDPROF_WEAK void *pvalloc(size_t size) NOEXCEPT;
 DDPROF_WEAK void *__mmap(void *addr, size_t length, int prot, int flags, int fd,
                          off_t offset);
 DDPROF_WEAK int __munmap(void *addr, size_t length);
+DDPROF_WEAK void *mremap(void *old_address, size_t old_size, size_t new_size,
+                         int flags, ...) NOEXCEPT;
+DDPROF_WEAK void *shmat(int shmid, const void *shmaddr, int shmflg) NOEXCEPT;
+DDPROF_WEAK int shmdt(const void *shmaddr) NOEXCEPT;
 }
 
 namespace ddprof {
@@ -505,7 +511,34 @@ DDPROF_NOINLINE void test_allocation_functions(RingBuffer &ring_buffer) {
     SCOPED_TRACE("__mmap/__munmap");
     checker.test_alloc(mmap_wrapper(&::__mmap), &::__munmap);
   }
-
+  if (mremap) {
+    SCOPED_TRACE("mremap");
+    checker.test_realloc(
+        mmap_wrapper(&::mmap),
+        [](void *ptr, size_t new_sz) {
+          auto old_sz = alloc_size;
+          auto *new_ptr = ::mremap(ptr, old_sz, new_sz, MREMAP_MAYMOVE);
+          return std::make_pair(new_ptr, new_sz);
+        },
+        [](void *ptr, size_t sz) { ::munmap(ptr, sz); });
+  }
+  if (shmat && shmdt) {
+    SCOPED_TRACE("shmat/shmdt");
+    // Create a System V shared memory segment
+    int shmid = shmget(IPC_PRIVATE, alloc_size, IPC_CREAT | 0600);
+    if (shmid != -1) {
+      checker.empty_ring_buffer();
+      void *ptr = ::shmat(shmid, nullptr, 0);
+      if (ptr != reinterpret_cast<void *>(-1)) {
+        checker.check_alloc(ptr, alloc_size);
+        checker.check_empty();
+        ::shmdt(ptr);
+        checker.check_dealloc(ptr);
+        checker.check_empty();
+      }
+      shmctl(shmid, IPC_RMID, nullptr);
+    }
+  }
   static constexpr size_t big_align = alignof(std::max_align_t) * 2;
   static constexpr size_t array_size = 16;
   static_assert((alloc_size / array_size) % big_align == 0);
