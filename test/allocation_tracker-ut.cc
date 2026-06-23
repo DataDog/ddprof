@@ -67,7 +67,6 @@ DDPROF_WEAK void *mremap(void *old_address, size_t old_size, size_t new_size,
                          int flags, ...) NOEXCEPT;
 DDPROF_WEAK void *shmat(int shmid, const void *shmaddr, int shmflg) NOEXCEPT;
 DDPROF_WEAK int shmdt(const void *shmaddr) NOEXCEPT;
-DDPROF_WEAK void *sbrk(intptr_t increment) NOEXCEPT;
 }
 
 namespace ddprof {
@@ -540,20 +539,6 @@ DDPROF_NOINLINE void test_allocation_functions(RingBuffer &ring_buffer) {
       shmctl(shmid, IPC_RMID, nullptr);
     }
   }
-  if (sbrk) {
-    SCOPED_TRACE("sbrk");
-    checker.empty_ring_buffer();
-    // sbrk with positive increment allocates
-    void *ptr = ::sbrk(static_cast<intptr_t>(alloc_size));
-    if (ptr != reinterpret_cast<void *>(-1)) {
-      checker.check_alloc(ptr, alloc_size);
-      checker.check_empty();
-      // Note: we don't track sbrk shrinking, so no dealloc check
-      ::sbrk(-static_cast<intptr_t>(alloc_size));
-      checker.check_empty();
-    }
-  }
-
   static constexpr size_t big_align = alignof(std::max_align_t) * 2;
   static constexpr size_t array_size = 16;
   static_assert((alloc_size / array_size) % big_align == 0);

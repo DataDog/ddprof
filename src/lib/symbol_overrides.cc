@@ -41,8 +41,10 @@ DDPROF_WEAK void *mremap(void *old_address, size_t old_size, size_t new_size,
                          int flags, ...) NOEXCEPT;
 DDPROF_WEAK void *shmat(int shmid, const void *shmaddr, int shmflg) NOEXCEPT;
 DDPROF_WEAK int shmdt(const void *shmaddr) NOEXCEPT;
-DDPROF_WEAK int brk(void *addr) NOEXCEPT;
-DDPROF_WEAK void *sbrk(intptr_t increment) NOEXCEPT;
+// brk()/sbrk() are not instrumented:
+// - They grow/shrink the program break, not individual allocations
+// - Would double-count if malloc uses them internally
+// - Tracking would require maintaining state of what's actually allocated
 DDPROF_WEAK int __libc_allocate_rtsig(int high) NOEXCEPT;
 // NOLINTEND
 
@@ -916,37 +918,6 @@ struct ShmdtHook : HookBase {
   }
 };
 
-struct BrkHook : HookBase {
-  static constexpr auto name = "brk";
-  using FuncType = decltype(&::brk);
-  static inline FuncType ref{};
-
-  static int hook(void *addr) noexcept {
-    // brk() sets the absolute program break. Tracking incremental changes
-    // would require maintaining previous state. Since brk is rarely called
-    // directly (malloc implementations use it), skip tracking.
-    return ref(addr);
-  }
-};
-
-struct SbrkHook : HookBase {
-  static constexpr auto name = "sbrk";
-  using FuncType = decltype(&::sbrk);
-  static inline FuncType ref{};
-
-  static void *hook(intptr_t increment) noexcept {
-    void *ptr = ref(increment);
-    if (increment > 0 && ptr != reinterpret_cast<void *>(-1)) {
-      // sbrk returns the previous break; the new allocation starts there
-      AllocTrackerHelperMmap helper;
-      helper.track(ptr, static_cast<size_t>(increment));
-    }
-    // Negative increments (shrinking heap) are not tracked as deallocations
-    // since we don't have the original allocation address.
-    return ptr;
-  }
-};
-
 template <typename T> void register_hook() {
   g_symbol_overrides->register_override(T::name,
                                         reinterpret_cast<uintptr_t>(&T::hook),
@@ -1015,8 +986,6 @@ void register_hooks() {
   register_hook<MremapHook>();
   register_hook<ShmatHook>();
   register_hook<ShmdtHook>();
-  register_hook<SbrkHook>();
-  register_hook<BrkHook>();
 
   register_hook<MallocxHook>();
   register_hook<RallocxHook>();
