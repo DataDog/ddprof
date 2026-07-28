@@ -2,6 +2,9 @@
 
 The Datadog Native Profiler for Linux.
 
+> [!IMPORTANT]
+> `ddprof` is in maintenance mode: we address security and critical bug fixes, but no new features are being added. We are moving to a host-based eBPF profiler integrated into the Datadog Agent. See [#557](https://github.com/DataDog/ddprof/issues/557) for details and migration guidance.
+
 ## Overview
 
 `ddprof` is a command-line utility to gather profiling data. After install you will continuously see where your application is spending CPU and memory allocations.
