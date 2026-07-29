@@ -237,9 +237,29 @@ DDRes report_module(Dwfl *dwfl, ProcessAddress_t pc, const Dso &dso,
     return ddres_warn(DD_WHAT_MODULE);
   }
 
-  UniqueFd fd_holder{::open(filepath.c_str(), O_RDONLY | O_CLOEXEC)};
-  if (!fd_holder) {
+  auto cached_elf_file = dso.get_cached_elf_file();
+  if (!cached_elf_file) {
+    LG_WRN("[Mod] Missing cached file state for module (%s)", filepath.c_str());
+    return ddres_warn(DD_WHAT_MODULE);
+  }
+
+  // Open lazily; the shared cache entry keeps the fd alive as long as some DSO
+  // mapping still references this file.
+  auto &cached_fd = cached_elf_file->_fd;
+  if (!cached_fd) {
+    cached_fd = UniqueFd{::open(filepath.c_str(), O_RDONLY | O_CLOEXEC)};
+    LG_DBG("[Mod] Opened and cached fd for %s", filepath.c_str());
+  }
+  if (!cached_fd) {
     LG_WRN("[Mod] Couldn't open fd to module (%s)", filepath.c_str());
+    return ddres_warn(DD_WHAT_MODULE);
+  }
+  // dup with O_CLOEXEC preserved: plain dup() drops close-on-exec, which
+  // would leak ELF fds into exec'd children. F_DUPFD_CLOEXEC atomically
+  // duplicates and sets FD_CLOEXEC, matching the original open(O_CLOEXEC).
+  UniqueFd fd_holder{::fcntl(cached_fd.get(), F_DUPFD_CLOEXEC, 0)};
+  if (!fd_holder) {
+    LG_WRN("[Mod] Couldn't dup fd to module (%s)", filepath.c_str());
     return ddres_warn(DD_WHAT_MODULE);
   }
   LG_DBG("[Mod] Success opening %s, ", filepath.c_str());
