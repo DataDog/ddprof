@@ -24,10 +24,12 @@ char StatusLine[] =
 
 }
 
-DDRes proc_read(ProcStatus *procstat) {
-  UniqueFile const f{fopen("/proc/self/stat", "r")};
+DDRes proc_read_pid(pid_t pid, ProcStatus *procstat) {
+  char path[64];
+  snprintf(path, sizeof(path), "/proc/%d/stat", pid);
+  UniqueFile const f{fopen(path, "r")};
   if (!f) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to open /proc/self/stat");
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to open %s", path);
   }
 
   if (0 > fscanf(f.get(), StatusLine, &procstat->pid, &procstat->comm,
@@ -49,9 +51,13 @@ DDRes proc_read(ProcStatus *procstat) {
                  &procstat->start_data, &procstat->end_data,
                  &procstat->start_brk, &procstat->arg_start, &procstat->arg_end,
                  &procstat->env_start, &procstat->env_end)) {
-    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to read /proc/self/stat");
+    DDRES_RETURN_ERROR_LOG(DD_WHAT_PROCSTATE, "Failed to read %s", path);
   }
   return {};
+}
+
+DDRes proc_read(ProcStatus *procstat) {
+  return proc_read_pid(getpid(), procstat);
 }
 
 bool check_file_type(const char *pathname, int file_type) {

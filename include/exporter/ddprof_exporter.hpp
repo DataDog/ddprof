@@ -12,6 +12,7 @@
 #include "tags.hpp"
 
 #include <datadog/common.h>
+#include <string>
 
 struct ddog_prof_ProfileExporter;
 struct ddog_prof_Profile;
@@ -37,6 +38,7 @@ DDRes ddprof_exporter_new(const UserTags *user_tags, DDProfExporter *exporter);
 
 DDRes ddprof_exporter_export(ddog_prof_Profile *profile,
                              const Tags &additional_tags, uint32_t profile_seq,
+                             const std::string &metrics_json,
                              DDProfExporter *exporter);
 
 DDRes ddprof_exporter_free(DDProfExporter *exporter);
