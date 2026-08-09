@@ -6,12 +6,15 @@
 #include "ddprof_worker.hpp"
 
 #include "ddprof_context.hpp"
+#include "ddprof_context_lib.hpp"
 #include "ddprof_perf_event.hpp"
 #include "ddprof_stats.hpp"
 #include "dso_hdr.hpp"
 #include "exporter/ddprof_exporter.hpp"
+#include "live_allocation_snapshot.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
+#include "persistent_worker_state.hpp"
 #include "pevent_lib.hpp"
 #include "pprof/ddprof_pprof.hpp"
 #include "procutils.hpp"
@@ -561,6 +564,27 @@ DDRes worker_library_init(DDProfContext &ctx,
     ctx.worker_ctx.exp[1] = nullptr;
     ctx.worker_ctx.pprof[0] = nullptr;
     ctx.worker_ctx.pprof[1] = nullptr;
+
+    // If the previous worker handed us a live-allocation snapshot, replay
+    // it before the poll loop starts draining new events. Restored entries
+    // use string storage owned by LiveAllocation itself.
+    if (persistent_worker_state &&
+        persistent_worker_state->live_alloc_snapshot_fd >= 0 &&
+        context_allocation_profiling_watcher_idx(ctx) != -1) {
+      live_alloc_snapshot::Snapshot snap;
+      if (live_alloc_snapshot::read_from_fd(
+              persistent_worker_state->live_alloc_snapshot_fd, snap)) {
+        if (!snap.stacks.empty() || !snap.pids.empty()) {
+          live_alloc_snapshot::restore_snapshot(snap,
+                                                ctx.worker_ctx.live_allocation,
+                                                ctx.worker_ctx.us->symbol_hdr);
+          LG_NTC("[live-alloc] Snapshot restored: stacks=%zu pids=%zu "
+                 "cleared=%u dropped_pids=%u",
+                 snap.stacks.size(), snap.pids.size(), snap.cleared_addresses,
+                 snap.dropped_pids);
+        }
+      }
+    }
   }
   CatchExcept2DDRes();
   return {};

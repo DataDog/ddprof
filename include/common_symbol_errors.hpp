@@ -14,10 +14,14 @@ using namespace std::string_view_literals;
 
 namespace ddprof {
 
-inline constexpr std::array<std::string_view, 6> k_common_frame_names = {
-    "[truncated]"sv,      "[unknown mapping]"sv,
-    "[unwind failure]"sv, "[incomplete]"sv,
-    "[lost]"sv,           "[maximum pids]"sv};
+inline constexpr std::array<std::string_view, 7> k_common_frame_names = {
+    "[truncated]"sv,
+    "[unknown mapping]"sv,
+    "[unwind failure]"sv,
+    "[incomplete]"sv,
+    "[lost]"sv,
+    "[maximum pids]"sv,
+    "[live-alloc cleared]"sv};
 
 enum SymbolErrors : std::uint8_t {
   truncated_stack = 0,
@@ -26,6 +30,7 @@ enum SymbolErrors : std::uint8_t {
   incomplete_stack,
   lost_event,
   max_pids,
+  live_alloc_cleared,
 };
 
 } // namespace ddprof

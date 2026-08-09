@@ -6,15 +6,18 @@
 #include "perf_mainloop.hpp"
 
 #include "ddprof_context_lib.hpp"
+#include "ddprof_stats.hpp"
 #include "ddprof_worker.hpp"
 #include "ddres.hpp"
 #include "defer.hpp"
 #include "ipc.hpp"
+#include "live_allocation_snapshot.hpp"
 #include "logger.hpp"
 #include "perf.hpp"
 #include "persistent_worker_state.hpp"
 #include "pevent.hpp"
 #include "ringbuffer_utils.hpp"
+#include "syscalls.hpp"
 #include "unique_fd.hpp"
 #include "unwind.h"
 #include "unwind_state.hpp"
@@ -439,6 +442,50 @@ DDRes worker_loop(DDProfContext &ctx, const WorkerAttr *attr,
     DDRES_CHECK_FWD(ddprof_worker_maybe_export(ctx, now));
 
     if (ctx.worker_ctx.persistent_worker_state->restart_worker) {
+      // Snapshot the live-allocation aggregator so the next worker can
+      // resume heap tracking without losing in-flight live addresses.
+      int const snap_fd =
+          ctx.worker_ctx.persistent_worker_state->live_alloc_snapshot_fd;
+      if (snap_fd >= 0 && context_allocation_profiling_watcher_idx(ctx) != -1) {
+        // Allow tests / debugging to override the snapshot budget without
+        // touching the CLI. Honored at every capture; capped at the hard
+        // ceiling defined in the snapshot module.
+        std::size_t max_bytes =
+            live_alloc_snapshot::k_default_max_snapshot_bytes;
+        if (const char *env = std::getenv(
+                "DD_PROFILING_NATIVE_LIVE_ALLOC_SNAPSHOT_MAX_BYTES")) {
+          char *end = nullptr;
+          unsigned long long const v = std::strtoull(env, &end, 10);
+          if (end != env && v > 0) {
+            max_bytes = std::min<std::size_t>(
+                static_cast<std::size_t>(v),
+                live_alloc_snapshot::k_hard_max_snapshot_bytes);
+          } else {
+            LG_WRN("[live-alloc] Invalid "
+                   "DD_PROFILING_NATIVE_LIVE_ALLOC_SNAPSHOT_MAX_BYTES=%s",
+                   env);
+          }
+        }
+        auto snap = live_alloc_snapshot::capture_snapshot(
+            ctx.worker_ctx.live_allocation, ctx.worker_ctx.us->symbol_hdr,
+            max_bytes);
+        if (!live_alloc_snapshot::write_to_fd(snap_fd, snap)) {
+          LG_WRN("[live-alloc] Failed to write snapshot before restart");
+        } else {
+          off_t const snap_size = lseek(snap_fd, 0, SEEK_END);
+          if (snap_size >= 0) {
+            ddprof_stats_set(STATS_LIVE_ALLOC_SNAPSHOT_BYTES,
+                             static_cast<long>(snap_size));
+          }
+          LG_NTC("[live-alloc] Snapshot written: stacks=%zu pids=%zu "
+                 "cleared=%u dropped_pids=%u",
+                 snap.stacks.size(), snap.pids.size(), snap.cleared_addresses,
+                 snap.dropped_pids);
+          ddprof_stats_set(STATS_LIVE_ALLOC_CLEARED_STACKS,
+                           snap.cleared_addresses);
+          ddprof_stats_set(STATS_LIVE_ALLOC_DROPPED_PIDS, snap.dropped_pids);
+        }
+      }
       // return directly no need to do a final export
       return {};
     }
@@ -487,6 +534,24 @@ DDRes main_loop(const WorkerAttr *attr, DDProfContext *ctx) {
   }
 
   defer { munmap(persistent_worker_state, sizeof(*persistent_worker_state)); };
+
+  // Allocate a memfd that the parent keeps open for the lifetime of the
+  // run. Each worker child inherits this fd and uses it as a hand-off
+  // buffer for its LiveAllocation snapshot when a restart is requested.
+  // Clearing CLOEXEC because we want the fd to survive across the child's
+  // execve-less life cycle and be reusable by the next forked child.
+  persistent_worker_state->live_alloc_snapshot_fd =
+      memfd_create("ddprof_live_alloc", 0U);
+  if (persistent_worker_state->live_alloc_snapshot_fd < 0) {
+    LG_WRN("memfd_create for live-alloc snapshot failed (errno=%d); "
+           "live-allocation state will be lost on worker resets",
+           errno);
+  }
+  defer {
+    if (persistent_worker_state->live_alloc_snapshot_fd >= 0) {
+      close(persistent_worker_state->live_alloc_snapshot_fd);
+    }
+  };
 
   // Create worker processes to fulfill poll loop.  Only the parent process
   // can exit with an error code, which signals the termination of profiling.
