@@ -31,6 +31,7 @@ struct DDProfPProf {
     ddog_prof_StringId2 thread_id{};
     ddog_prof_StringId2 thread_name{};
     ddog_prof_StringId2 tracepoint_type{};
+    ddog_prof_StringId2 process_language{};
   };
 
   /* single profile gathering several value types */
