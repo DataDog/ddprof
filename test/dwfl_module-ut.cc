@@ -19,6 +19,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifdef __GLIBC__
+#  include <dlfcn.h>
+#  include <link.h>
+#endif
+
 extern "C" int unwind_module_fixture();
 
 namespace ddprof {
@@ -224,6 +229,7 @@ TEST(DwflModule, same_file_at_different_load_addresses) {
       IsDDResOK(wrapper.register_mod(pc, first_dso, file_info, &first)));
   ASSERT_NE(first, nullptr);
   EXPECT_EQ(wrapper.get(file_id, pc), first);
+  EXPECT_EQ(wrapper.get(file_id, first->_low_addr), first);
   EXPECT_EQ(wrapper.get(file_id, second_pc), nullptr);
 
   DDProfMod *second = nullptr;
@@ -238,5 +244,59 @@ TEST(DwflModule, same_file_at_different_load_addresses) {
   EXPECT_EQ(wrapper.get(file_id, first->_high_addr), nullptr);
   EXPECT_EQ(wrapper.get(file_id + 1, pc), nullptr);
 }
+
+#ifdef __GLIBC__
+TEST(DwflModule, same_file_in_different_linker_namespaces) {
+  if (dlsym(RTLD_DEFAULT, "__asan_init") ||
+      dlsym(RTLD_DEFAULT, "__tsan_init")) {
+    GTEST_SKIP() << "Sanitizer runtimes do not support dlmopen namespaces";
+  }
+  Dl_info info{};
+  ASSERT_NE(dladdr(reinterpret_cast<void *>(&unwind_module_fixture), &info), 0);
+  void *first_handle =
+      dlmopen(LM_ID_NEWLM, info.dli_fname, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_NE(first_handle, nullptr) << dlerror();
+  defer { dlclose(first_handle); };
+  void *second_handle =
+      dlmopen(LM_ID_NEWLM, info.dli_fname, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_NE(second_handle, nullptr) << dlerror();
+  defer { dlclose(second_handle); };
+  auto *first_address = dlsym(first_handle, "unwind_module_fixture");
+  auto *second_address = dlsym(second_handle, "unwind_module_fixture");
+  ASSERT_NE(first_address, nullptr);
+  ASSERT_NE(second_address, nullptr);
+  const auto first_pc = reinterpret_cast<ProcessAddress_t>(first_address);
+  const auto second_pc = reinterpret_cast<ProcessAddress_t>(second_address);
+  ASSERT_NE(first_pc, second_pc);
+
+  DsoHdr dso_hdr;
+  const auto first_dso = dso_hdr.dso_find_or_backpopulate(getpid(), first_pc);
+  const auto second_dso = dso_hdr.dso_find_or_backpopulate(getpid(), second_pc);
+  ASSERT_TRUE(first_dso.second);
+  ASSERT_TRUE(second_dso.second);
+  const auto file_id = dso_hdr.get_or_insert_file_info(first_dso.first->second);
+  ASSERT_GT(file_id, k_file_info_error);
+  ASSERT_EQ(file_id, dso_hdr.get_or_insert_file_info(second_dso.first->second));
+  const auto &file_info = dso_hdr.get_file_info_value(file_id);
+  auto ref_elf = create_elf_from_self();
+  DwflWrapper wrapper;
+  ASSERT_TRUE(IsDDResOK(wrapper.attach(getpid(), ref_elf, nullptr)));
+  DDProfMod *first = nullptr;
+  ASSERT_TRUE(IsDDResOK(wrapper.register_mod(first_pc, first_dso.first->second,
+                                             file_info, &first)));
+  ASSERT_NE(first, nullptr);
+  ASSERT_EQ(wrapper.get(file_id, second_pc), nullptr);
+  DDProfMod *second = nullptr;
+  ASSERT_TRUE(IsDDResOK(wrapper.register_mod(
+      second_pc, second_dso.first->second, file_info, &second)));
+  ASSERT_NE(second, nullptr);
+  EXPECT_NE(first, second);
+  EXPECT_EQ(first->_build_id, second->_build_id);
+  EXPECT_NE(first->_sym_bias, second->_sym_bias);
+  EXPECT_EQ(first_pc - first->_sym_bias, second_pc - second->_sym_bias);
+  EXPECT_EQ(wrapper.get(file_id, first_pc), first);
+  EXPECT_EQ(wrapper.get(file_id, second_pc), second);
+}
+#endif
 
 } // namespace ddprof
