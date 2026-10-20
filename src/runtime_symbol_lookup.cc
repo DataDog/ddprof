@@ -67,30 +67,30 @@ bool RuntimeSymbolLookup::insert_or_replace(
   }
 
   SymbolMap::FindRes const find_res = symbol_map.find_closest(address);
-  if (!find_res.second) {
-    symbol_map.emplace_hint(
-        find_res.first, address,
-        SymbolSpan(address + code_size - 1, symbol_table.size()));
-    symbol_table.emplace_back(make_symbol(std::string(symbol), 0, "jit", dict));
-  } else {
-    // todo managing range erase (we can overlap with other syms)
+  if (find_res.second) {
     SymbolIdx_t const existing = find_res.first->second.get_symbol_idx();
     ddog_prof_StringId2 name_id = intern_string(dict, symbol);
-    // ProfilesDictionary canonicalizes strings within a dictionary, so handle
-    // comparison avoids materializing strings on this hot path.
     if (symbol_table[existing]._function_id &&
         symbol_table[existing]._function_id->name == name_id) {
       find_res.first->second.set_end(address + code_size - 1);
-    } else {
-      // remove current element (as start can be different)
-      symbol_map.erase(find_res.first);
-      symbol_map.emplace(address,
-                         SymbolSpan(address + code_size - 1, existing));
-      Symbol &existing_symbol = symbol_table[existing];
-      existing_symbol._function_id = intern_function(dict, symbol, "jit");
+      return true;
     }
   }
 
+  const auto function = intern_function(dict, symbol, "jit");
+  if (!function) {
+    return false;
+  }
+  const auto [it, inserted] =
+      _function_symbols.try_emplace(function, symbol_table.size());
+  if (inserted) {
+    symbol_table.emplace_back(0, function);
+  }
+  if (find_res.second) {
+    // Saved allocation stacks can still refer to the old symbol-table entry.
+    symbol_map.erase(find_res.first);
+  }
+  symbol_map.emplace(address, SymbolSpan(address + code_size - 1, it->second));
   return true;
 }
 namespace {
