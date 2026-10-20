@@ -15,6 +15,7 @@
 #include <dlfcn.h>
 #include <functional>
 #include <iostream>
+#include <sys/auxv.h>
 #include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
@@ -280,6 +281,7 @@ int main(int argc, char *argv[]) {
     unsigned int nb_threads{1};
 
     Options opts;
+    bool show_security_context = false;
     std::vector<std::string> exec_args;
 
     constexpr size_t k_default_malloc_size{1000};
@@ -338,6 +340,8 @@ int main(int argc, char *argv[]) {
         ->check(CLI::Bound(-20, 19)); // NOLINT(readability-magic-numbers)
     app.add_flag("--stop", opts.stop,
                  "Stop process just after spawning fork / threads");
+    app.add_flag("--show-security-context", show_security_context,
+                 "Print UID, AT_SECURE, and LD_PRELOAD presence");
 
     if (opts.nice != 0) {
       setpriority(PRIO_PROCESS, 0, opts.nice);
@@ -355,6 +359,11 @@ int main(int argc, char *argv[]) {
 #  endif
 
     CLI11_PARSE(app, argc, argv);
+    if (show_security_context) {
+      printf("TestSecurity: uid=%u euid=%u at_secure=%lu ld_preload=%s\n",
+             static_cast<unsigned>(getuid()), static_cast<unsigned>(geteuid()),
+             getauxval(AT_SECURE), getenv("LD_PRELOAD") ? "set" : "unset");
+    }
 #  ifdef USE_DD_PROFILING
     if (start_profiling && ddprof_start_profiling() != 0) {
       fprintf(stderr, "Failed to start profiling\n");
