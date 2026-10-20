@@ -15,6 +15,7 @@
 #include <memory>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -117,26 +118,18 @@ private:
           symbolizer(blaze_symbolizer_new_opts(&opts)),
           elf_src(std::move(elf_src)), use_debug(inlined_fns) {}
 
-    // Two-level cache to avoid re-interning FunctionId2 handles on every
-    // sample.
-    //
-    // Level 1 — function identity (shared across all call sites of same
-    // function):
-    //   func_start_addr → FunctionId2  (outer frames, keyed by blaze_sym.addr)
-    //   {elf_addr, inlined_idx}        → FunctionId2  (inlined frames)
-    //
-    // Level 2 — per call-site (fast full hit when we've seen this exact
-    // address):
-    //   elf_addr → { func_start, lines[] }
-    //
-    // On a cache miss for a new elf_addr, we still run blaze but check
-    // function_id_cache[func_start] for the outer frame — saving
-    // intern_function calls when the same function is reached from multiple
-    // call sites.
-
     struct AddressCacheEntry {
-      ElfAddress_t func_start;     // blaze_sym.addr (function start address)
-      std::vector<uint32_t> lines; // line per frame: inlined first, outer last
+      ddog_prof_FunctionId2 outer_function{};
+      std::vector<uint32_t> lines; // inlined frames first, outer frame last
+    };
+
+    using FunctionKey = std::pair<ElfAddress_t, std::string_view>;
+    struct FunctionKeyHash {
+      std::size_t operator()(const FunctionKey &key) const {
+        std::size_t h = std::hash<ElfAddress_t>{}(key.first);
+        hash_combine(h, key.second);
+        return h;
+      }
     };
 
     // Pair hash for the inlined_id_cache using the shared hash_combine helper.
@@ -154,8 +147,9 @@ private:
     blaze_symbolizer_opts opts;
     std::unique_ptr<blaze_symbolizer, BlazeSymbolizerDeleter> symbolizer;
     ddprof::HeterogeneousLookupStringMap<std::string> demangled_names;
-    // func_start → FunctionId2 (outer frames, shared across all call sites)
-    std::unordered_map<ElfAddress_t, ddog_prof_FunctionId2> function_id_cache;
+    // Filename views refer to dictionary-owned strings.
+    std::unordered_map<FunctionKey, ddog_prof_FunctionId2, FunctionKeyHash>
+        function_id_cache;
     // {elf_addr, inlined_idx} → FunctionId2 (inlined frames, per call site)
     std::unordered_map<std::pair<ElfAddress_t, unsigned>, ddog_prof_FunctionId2,
                        InlinedKeyHash>
