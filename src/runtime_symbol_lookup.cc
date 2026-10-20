@@ -77,7 +77,7 @@ bool RuntimeSymbolLookup::insert_or_replace(
     }
   }
 
-  const auto function = intern_function(dict, symbol, "jit");
+  auto *const function = intern_function(dict, symbol, "jit");
   if (!function) {
     return false;
   }
