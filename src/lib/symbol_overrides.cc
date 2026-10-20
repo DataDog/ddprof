@@ -22,7 +22,9 @@
 #include <ctime>
 #include <dlfcn.h>
 #include <malloc.h>
+#include <sys/ipc.h>
 #include <sys/mman.h>
+#include <sys/shm.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
 #  define NOEXCEPT noexcept
@@ -35,6 +37,14 @@ extern "C" {
 // Declaration of reallocarray is only available starting from glibc 2.28
 DDPROF_WEAK void *reallocarray(void *ptr, size_t nmemb, size_t nmenb) NOEXCEPT;
 DDPROF_WEAK void *pvalloc(size_t size) NOEXCEPT;
+DDPROF_WEAK void *mremap(void *old_address, size_t old_size, size_t new_size,
+                         int flags, ...) NOEXCEPT;
+DDPROF_WEAK void *shmat(int shmid, const void *shmaddr, int shmflg) NOEXCEPT;
+DDPROF_WEAK int shmdt(const void *shmaddr) NOEXCEPT;
+// brk()/sbrk() are not instrumented:
+// - They grow/shrink the program break, not individual allocations
+// - Would double-count if malloc uses them internally
+// - Tracking would require maintaining state of what's actually allocated
 DDPROF_WEAK int __libc_allocate_rtsig(int high) NOEXCEPT;
 // NOLINTEND
 
@@ -857,6 +867,57 @@ struct Munmap_Hook : HookBase {
   }
 };
 
+struct MremapHook : HookBase {
+  static constexpr auto name = "mremap";
+  using FuncType = decltype(&::mremap);
+  static inline FuncType ref{};
+
+  static void *hook(void *old_address, size_t old_size, size_t new_size,
+                    int flags) noexcept {
+    AllocTrackerHelperMmap helper;
+    if (likely(old_address) && helper) {
+      ddprof::AllocationTracker::track_deallocation_s(
+          reinterpret_cast<uintptr_t>(old_address), *helper.tl_state(), true);
+    }
+    auto *new_ptr = ref(old_address, old_size, new_size, flags);
+    if (likely(new_size && new_ptr != MAP_FAILED)) {
+      helper.track(new_ptr, new_size);
+    }
+    return new_ptr;
+  }
+};
+
+struct ShmatHook : HookBase {
+  static constexpr auto name = "shmat";
+  using FuncType = decltype(&::shmat);
+  static inline FuncType ref{};
+
+  static void *hook(int shmid, const void *shmaddr, int shmflg) noexcept {
+    void *ptr = ref(shmid, shmaddr, shmflg);
+    if (ptr != reinterpret_cast<void *>(-1)) {
+      AllocTrackerHelperMmap helper;
+      // Query the segment size via shmctl
+      struct shmid_ds buf;
+      if (shmctl(shmid, IPC_STAT, &buf) == 0) {
+        helper.track(ptr, buf.shm_segsz);
+      }
+    }
+    return ptr;
+  }
+};
+
+struct ShmdtHook : HookBase {
+  static constexpr auto name = "shmdt";
+  using FuncType = decltype(&::shmdt);
+  static inline FuncType ref{};
+
+  static int hook(const void *shmaddr) noexcept {
+    DeallocTrackerHelperMmap helper;
+    helper.track(const_cast<void *>(shmaddr));
+    return ref(shmaddr);
+  }
+};
+
 template <typename T> void register_hook() {
   g_symbol_overrides->register_override(T::name,
                                         reinterpret_cast<uintptr_t>(&T::hook),
@@ -922,6 +983,9 @@ void register_hooks() {
   register_hook<MunmapHook>();
   register_hook<Mmap_Hook>();
   register_hook<Munmap_Hook>();
+  register_hook<MremapHook>();
+  register_hook<ShmatHook>();
+  register_hook<ShmdtHook>();
 
   register_hook<MallocxHook>();
   register_hook<RallocxHook>();
