@@ -31,7 +31,7 @@ using namespace std::string_view_literals;
 namespace ddprof {
 
 namespace {
-constexpr size_t k_max_pprof_labels{8};
+constexpr size_t k_max_pprof_labels{9};
 
 constexpr std::string_view k_container_id_label = "container_id"sv;
 constexpr std::string_view k_process_id_label = "process_id"sv;
@@ -41,6 +41,7 @@ constexpr std::string_view k_process_name_label = "process_name"sv;
 constexpr std::string_view k_thread_id_label = "thread id"sv;
 constexpr std::string_view k_thread_name_label = "thread_name"sv;
 constexpr std::string_view k_tracepoint_label = "tracepoint_type"sv;
+constexpr std::string_view k_process_language_label = "process_language"sv;
 
 // Maps a ddog_prof_SampleType to the kebab-case name used in debug log output
 // (must match what simple_malloc-ut.sh greps for).
@@ -100,6 +101,7 @@ void init_dict_label_key_ids(DDProfPProf::DictLabelKeyIds &label_keys,
   label_keys.thread_id = intern_string(dict, k_thread_id_label);
   label_keys.thread_name = intern_string(dict, k_thread_name_label);
   label_keys.tracepoint_type = intern_string(dict, k_tracepoint_label);
+  label_keys.process_language = intern_string(dict, k_process_language_label);
 }
 
 size_t prepare_labels2(const UnwindOutput &uw_output,
@@ -140,6 +142,9 @@ size_t prepare_labels2(const UnwindOutput &uw_output,
   }
   if (!uw_output.thread_name.empty()) {
     push_label(label_keys.thread_name, uw_output.thread_name);
+  }
+  if (!uw_output.language.empty()) {
+    push_label(label_keys.process_language, uw_output.language);
   }
 
   DDPROF_DCHECK_FATAL(labels_num <= labels.size(),

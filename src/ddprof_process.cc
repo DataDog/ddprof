@@ -145,6 +145,24 @@ const ContainerId &ProcessHdr::get_container_id(pid_t pid) {
   return p.get_container_id(_path_to_proc);
 }
 
+bool Process::detect_language_once(::Elf *main_exe_elf) {
+  if (_language_detected || main_exe_elf == nullptr) {
+    return false;
+  }
+  _language = detect_native_language(main_exe_elf);
+  _language_detected = true;
+  return true;
+}
+
+bool Process::detect_language_once_from_proc(std::string_view path_to_proc) {
+  if (_language_detected) {
+    return false;
+  }
+  _language = detect_native_language(_pid, path_to_proc);
+  _language_detected = true;
+  return true;
+}
+
 void ProcessHdr::flag_visited(pid_t pid) { _visited_pid.insert(pid); }
 
 Process &ProcessHdr::get(pid_t pid) {

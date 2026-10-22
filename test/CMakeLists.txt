@@ -99,6 +99,7 @@ set(PROCESS_SRC
     ../src/dso_hdr.cc
     ../src/dwfl_wrapper.cc
     ../src/dwfl_thread_callbacks.cc
+    ../src/native_language.cc
     ../src/procutils.cc
     ../src/signal_helper.cc
     ../src/stack_helper.cc

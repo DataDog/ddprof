@@ -34,11 +34,15 @@ struct UnwindOutput {
     container_id = k_container_id_unknown;
     exe_name = {};
     thread_name = {};
+    language = {};
   }
   std::vector<FunLoc> locs;
   std::string_view container_id;
   std::string_view exe_name;
   std::string_view thread_name;
+  // Heuristic native language of the process' main executable
+  // ("go"/"rust"/"cpp"). Empty -> caller falls back to "native".
+  std::string_view language;
   int pid;
   int tid;
   friend auto operator<=>(const UnwindOutput &, const UnwindOutput &) = default;
