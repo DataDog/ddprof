@@ -11,8 +11,13 @@
 #include "saveregisters.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
+#include <fcntl.h>
 #include <pthread.h>
+#include <sys/auxv.h>
+#include <sys/resource.h>
+#include <unistd.h>
 
 namespace ddprof {
 
@@ -32,6 +37,99 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
   }
   return {static_cast<std::byte *>(stack_addr),
           static_cast<std::byte *>(stack_addr) + stack_size};
+}
+
+namespace {
+struct Mapping {
+  uintptr_t start;
+  uintptr_t end;
+  uintptr_t prev_end; // end of the mapping just below, 0 if none
+};
+
+constexpr uintptr_t hex_digit(char c) {
+  return c <= '9' ? c - '0' : c - 'a' + 10;
+}
+
+// Returns the /proc/self/maps mapping containing addr, or zeros.
+Mapping find_mapping(uintptr_t addr) {
+  const int fd = ::open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
+  if (fd < 0) {
+    return {};
+  }
+  defer { ::close(fd); };
+
+  // Each line starts with "<start>-<end> " in lowercase hex; only that prefix
+  // is parsed, the rest of the line is skipped. Streaming over a small stack
+  // buffer avoids heap allocation and keeps the hook's stack usage low.
+  enum class Field : uint8_t { kStart, kEnd, kRestOfLine };
+  Field field = Field::kStart;
+  Mapping range{};
+  char buf[256];
+  ssize_t n;
+  while ((n = ::read(fd, buf, sizeof(buf))) != 0) {
+    if (n < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      return {};
+    }
+    for (const char c : std::span{buf, static_cast<size_t>(n)}) {
+      if (c == '\n') {
+        field = Field::kStart;
+        range = {.start = 0, .end = 0, .prev_end = range.end};
+      } else if (field == Field::kStart) {
+        if (c == '-') {
+          field = Field::kEnd;
+        } else {
+          range.start = (range.start << 4) | hex_digit(c);
+        }
+      } else if (field == Field::kEnd) {
+        if (c == ' ') {
+          if (range.start <= addr && addr < range.end) {
+            return range;
+          }
+          field = Field::kRestOfLine;
+        } else {
+          range.end = (range.end << 4) | hex_digit(c);
+        }
+      }
+    }
+  }
+  return {};
+}
+} // namespace
+
+DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
+  // Called from allocation hooks: the caller's errno must survive.
+  const int saved_errno = errno;
+  defer { errno = saved_errno; };
+
+  auto range =
+      find_mapping(reinterpret_cast<uintptr_t>(__builtin_frame_address(0)));
+  if (range.start == range.end) {
+    return {};
+  }
+  // The main thread [stack] mapping only covers what has been used so far;
+  // like glibc's pthread_getattr_np, extend it down to the rlimit size, capped
+  // by the mapping below (which also covers an unlimited rlimit), so that
+  // deeper stacks later still pass save_stack's bounds check. Only the lower
+  // bound moves, so no unmapped memory is ever copied.
+  // The kernel puts the AT_EXECFN string at the top of the initial stack, so
+  // this only applies when we are on that stack, not on a fiber/signal stack.
+  const auto execfn = static_cast<uintptr_t>(getauxval(AT_EXECFN));
+  if (range.start <= execfn && execfn < range.end) {
+    uintptr_t low = range.prev_end;
+    rlimit stack_limit;
+    if (::getrlimit(RLIMIT_STACK, &stack_limit) == 0 &&
+        stack_limit.rlim_cur != RLIM_INFINITY &&
+        stack_limit.rlim_cur < range.end) {
+      low = std::max(low,
+                     range.end - static_cast<uintptr_t>(stack_limit.rlim_cur));
+    }
+    range.start = std::min(range.start, low);
+  }
+  return {reinterpret_cast<const std::byte *>(range.start),
+          reinterpret_cast<const std::byte *>(range.end)};
 }
 
 namespace {

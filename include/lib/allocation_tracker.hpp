@@ -49,8 +49,6 @@ public:
 
   static void notify_thread_start();
   static void notify_fork();
-  static void notify_pthread_getattr_np();
-  static void notify_pthread_getattr_np_end();
 
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
                                         uint32_t flags,
@@ -72,18 +70,24 @@ public:
 
   static inline bool is_deallocation_tracking_active();
 
-  static TrackerThreadLocalState *init_tl_state();
+  // lazy: true when called from an allocation hook on a thread whose state
+  // was never initialized (eg. a thread started before profiling, or created
+  // by a library constructor running inside dlopen). Stack bounds then come
+  // from /proc/self/maps instead of pthread_getattr_np.
+  static TrackerThreadLocalState *init_tl_state(bool lazy = false);
 
-  // can return null if initialization failed/is not possible
+  // Returns null if the state is not initialized, unless
+  // lazy_init_if_needed is set (only allocation hooks should set it).
   static TrackerThreadLocalState *
-  get_tl_state(bool init_if_not_initialized = true);
+  get_tl_state(bool lazy_init_if_needed = false);
 
-  // does not init
-  static TrackerThreadLocalState &get_tl_state_no_init();
+  // For callers outside allocation hooks: initializes the state with
+  // pthread_getattr_np if needed. Returns null if tracking is not active.
+  static TrackerThreadLocalState *get_or_init_tl_state();
 
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
-  TrackerThreadLocalState *init_tl_state_internal();
+  TrackerThreadLocalState *init_tl_state_internal(bool lazy = false);
   static AllocationTracker *get_instance() {
     return _instance.load(std::memory_order_acquire);
   }

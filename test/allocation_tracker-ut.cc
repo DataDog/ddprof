@@ -668,4 +668,87 @@ TEST(allocation_tracker, test_allocation_functions) {
   restore_overrides();
 }
 
+namespace {
+struct TlStateResult {
+  bool initialized_before{true};
+  std::span<const std::byte> stack_bounds;
+};
+
+// Starts a thread whose stack is a sub-range of a larger anonymous mapping:
+// pthread_getattr_np reports the sub-range, while the /proc/self/maps mapping
+// containing the stack is the whole mapping. This tells which source was used.
+template <void (*InitFn)(TlStateResult &)>
+void run_on_custom_stack(std::span<std::byte> stack, TlStateResult &result) {
+  pthread_attr_t attr;
+  ASSERT_EQ(pthread_attr_init(&attr), 0);
+  defer { pthread_attr_destroy(&attr); };
+  ASSERT_EQ(pthread_attr_setstack(&attr, stack.data(), stack.size()), 0);
+  pthread_t thread;
+  ASSERT_EQ(pthread_create(
+                &thread, &attr,
+                [](void *arg) -> void * {
+                  auto &res = *static_cast<TlStateResult *>(arg);
+                  res.initialized_before =
+                      AllocationTracker::get_tl_state() != nullptr;
+                  InitFn(res);
+                  return nullptr;
+                },
+                &result),
+            0);
+  pthread_join(thread, nullptr);
+}
+} // namespace
+
+TEST(allocation_tracker, tl_state_stack_bounds_source) {
+  RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
+  AllocationTracker::allocation_tracking_init(
+      kSamplingRate, AllocationTracker::kDeterministicSampling,
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
+  defer { AllocationTracker::allocation_tracking_free(); };
+
+  constexpr size_t kMappingSize = 4 * 1024 * 1024;
+  constexpr size_t kStackOffset = 1024 * 1024;
+  constexpr size_t kStackSize = 1024 * 1024;
+  void *mapping = mmap(nullptr, kMappingSize, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(mapping, MAP_FAILED);
+  defer { munmap(mapping, kMappingSize); };
+  std::span<std::byte> const mapping_span{static_cast<std::byte *>(mapping),
+                                          kMappingSize};
+  auto const stack = mapping_span.subspan(kStackOffset, kStackSize);
+
+  // Thread start (not inside an allocation hook) uses pthread_getattr_np.
+  TlStateResult thread_start;
+  run_on_custom_stack<[](TlStateResult &res) {
+    AllocationTracker::notify_thread_start();
+    res.stack_bounds = AllocationTracker::get_tl_state()->stack_bounds;
+  }>(stack, thread_start);
+  EXPECT_FALSE(thread_start.initialized_before);
+  EXPECT_GE(thread_start.stack_bounds.data(), stack.data());
+  EXPECT_LE(thread_start.stack_bounds.data() + thread_start.stack_bounds.size(),
+            stack.data() + stack.size());
+
+  // Callers outside hooks (eg. MaybeReentryGuard) also use pthread_getattr_np.
+  TlStateResult get_or_init;
+  run_on_custom_stack<[](TlStateResult &res) {
+    res.stack_bounds = AllocationTracker::get_or_init_tl_state()->stack_bounds;
+  }>(stack, get_or_init);
+  EXPECT_FALSE(get_or_init.initialized_before);
+  EXPECT_GE(get_or_init.stack_bounds.data(), stack.data());
+  EXPECT_LE(get_or_init.stack_bounds.data() + get_or_init.stack_bounds.size(),
+            stack.data() + stack.size());
+
+  // Lazy init from an allocation hook uses /proc/self/maps.
+  TlStateResult lazy;
+  run_on_custom_stack<[](TlStateResult &res) {
+    res.stack_bounds =
+        AllocationTracker::get_tl_state(/*lazy_init_if_needed=*/true)
+            ->stack_bounds;
+  }>(stack, lazy);
+  EXPECT_FALSE(lazy.initialized_before);
+  EXPECT_LE(lazy.stack_bounds.data(), mapping_span.data());
+  EXPECT_GE(lazy.stack_bounds.data() + lazy.stack_bounds.size(),
+            mapping_span.data() + mapping_span.size());
+}
+
 } // namespace ddprof
