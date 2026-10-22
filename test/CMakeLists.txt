@@ -399,6 +399,11 @@ add_unit_test(tracepoint_config-ut tracepoint_config-ut.cc ../src/tracepoint_con
 
 add_unit_test(live_allocation-ut live_allocation-ut.cc ../src/live_allocation.cc)
 
+add_unit_test(
+  live_allocation_snapshot-ut live_allocation_snapshot-ut.cc ../src/live_allocation_snapshot.cc
+  ../src/live_allocation.cc ../src/ddog_profiling_utils.cc ../src/demangler/demangler.cc
+  LIBRARIES Datadog::Profiling llvm-demangle)
+
 add_unit_test(ddprof_process-ut ddprof_process-ut.cc ${PROCESS_SRC} LIBRARIES ${ELFUTILS_LIBRARIES})
 
 add_unit_test(glibc_fixes-ut glibc_fixes-ut.cc ../src/lib/glibc_fixes.c LIBRARIES pthread)
