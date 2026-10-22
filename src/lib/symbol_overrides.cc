@@ -772,19 +772,6 @@ struct PthreadCreateHook : HookBase {
   }
 };
 
-struct PthreadGetattrHook : HookBase {
-  static constexpr auto name = "pthread_getattr_np";
-  using FuncType = decltype(&::pthread_getattr_np);
-  static inline FuncType ref{};
-
-  static int hook(pthread_t thread, pthread_attr_t *attr) noexcept {
-    ddprof::AllocationTracker::notify_pthread_getattr_np();
-    auto ret = ref(thread, attr);
-    ddprof::AllocationTracker::notify_pthread_getattr_np_end();
-    return ret;
-  }
-};
-
 struct MmapHook : HookBase {
   static constexpr auto name = "mmap";
   using FuncType = decltype(&::mmap);
@@ -934,7 +921,6 @@ void register_hooks() {
 
   register_hook<PthreadCreateHook>();
   register_hook<DlopenHook>();
-  register_hook<PthreadGetattrHook>();
 }
 
 } // namespace

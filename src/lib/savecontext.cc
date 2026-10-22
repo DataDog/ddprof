@@ -12,7 +12,6 @@
 
 #include <algorithm>
 #include <cerrno>
-#include <charconv>
 #include <cstring>
 #include <fcntl.h>
 #include <pthread.h>
@@ -39,15 +38,8 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
 }
 
 namespace {
-// Parses a "<start>-<end> ..." /proc/self/maps line prefix.
-bool parse_maps_range(const char *line, const char *end, uintptr_t &start,
-                      uintptr_t &stop) {
-  auto [p, ec] = std::from_chars(line, end, start, 16);
-  if (ec != std::errc{} || p == end || *p != '-') {
-    return false;
-  }
-  auto [p2, ec2] = std::from_chars(p + 1, end, stop, 16);
-  return ec2 == std::errc{} && p2 != p + 1;
+constexpr uintptr_t hex_digit(char c) {
+  return c <= '9' ? c - '0' : c - 'a' + 10;
 }
 } // namespace
 
@@ -59,49 +51,46 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
   }
   defer { ::close(fd); };
 
-  // Fixed stack buffer: no heap allocation. Lines longer than the buffer only
-  // need their leading address range, so the remainder is skipped.
+  // Each line starts with "<start>-<end> " in lowercase hex; only that prefix
+  // is parsed, the rest of the line is skipped. Streaming over a fixed stack
+  // buffer avoids any heap allocation.
+  enum class Field : uint8_t { kStart, kEnd, kRestOfLine };
+  Field field = Field::kStart;
+  uintptr_t start = 0;
+  uintptr_t end = 0;
   char buf[4096];
-  size_t len = 0;
-  bool skip_to_eol = false;
-  uintptr_t start;
-  uintptr_t stop;
-  auto contains_sp = [&](const char *line, const char *end) {
-    return !skip_to_eol && parse_maps_range(line, end, start, stop) &&
-        start <= sp && sp < stop;
-  };
-  while (true) {
-    const ssize_t n = ::read(fd, buf + len, sizeof(buf) - len);
-    if (n < 0 && errno == EINTR) {
-      continue;
-    }
-    if (n <= 0) {
+  ssize_t n;
+  while ((n = ::read(fd, buf, sizeof(buf))) != 0) {
+    if (n < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
       return {};
     }
-    len += static_cast<size_t>(n);
-    const char *line = buf;
-    const char *const end = buf + len;
-    while (const char *eol = static_cast<const char *>(
-               memchr(line, '\n', static_cast<size_t>(end - line)))) {
-      if (contains_sp(line, eol)) {
-        return {reinterpret_cast<const std::byte *>(start),
-                reinterpret_cast<const std::byte *>(stop)};
+    for (const char c : std::span{buf, static_cast<size_t>(n)}) {
+      if (c == '\n') {
+        field = Field::kStart;
+        start = end = 0;
+      } else if (field == Field::kStart) {
+        if (c == '-') {
+          field = Field::kEnd;
+        } else {
+          start = (start << 4) | hex_digit(c);
+        }
+      } else if (field == Field::kEnd) {
+        if (c == ' ') {
+          if (start <= sp && sp < end) {
+            return {reinterpret_cast<const std::byte *>(start),
+                    reinterpret_cast<const std::byte *>(end)};
+          }
+          field = Field::kRestOfLine;
+        } else {
+          end = (end << 4) | hex_digit(c);
+        }
       }
-      skip_to_eol = false;
-      line = eol + 1;
     }
-    size_t remaining = static_cast<size_t>(end - line);
-    if (remaining == sizeof(buf)) {
-      if (contains_sp(line, end)) {
-        return {reinterpret_cast<const std::byte *>(start),
-                reinterpret_cast<const std::byte *>(stop)};
-      }
-      skip_to_eol = true;
-      remaining = 0;
-    }
-    memmove(buf, line, remaining);
-    len = remaining;
   }
+  return {};
 }
 
 namespace {

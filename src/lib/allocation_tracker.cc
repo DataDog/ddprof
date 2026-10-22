@@ -74,19 +74,15 @@ void reset_pevent(PEvent &pevent) {
 }
 } // namespace
 
-TrackerThreadLocalState &AllocationTracker::get_tl_state_no_init() {
-  return *reinterpret_cast<TrackerThreadLocalState *>(ddprof_lib_state);
-}
-
 TrackerThreadLocalState *
 AllocationTracker::get_tl_state(bool init_if_not_initialized) {
   // ddprof_lib_state is zero-initialized by libc for each new thread.
   // After placement new (init_tl_state), initialized is set to true.
-  auto &state = get_tl_state_no_init();
-  if (state.initialized) {
-    return &state;
+  auto *state = reinterpret_cast<TrackerThreadLocalState *>(ddprof_lib_state);
+  if (state->initialized) {
+    return state;
   }
-  if (init_if_not_initialized && !state.reentry_guard) {
+  if (init_if_not_initialized) {
     return init_tl_state(/*lazy=*/true);
   }
   return nullptr;
@@ -100,9 +96,9 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state_internal(bool lazy) {
   // Lazy init runs inside an allocation hook, which may have been reached from
   // glibc's pthread_getattr_np while it holds this thread's lock (it calls
   // realloc under that lock). Calling pthread_getattr_np again here would
-  // self-deadlock. The reentry_guard set by our pthread_getattr_np hook cannot
-  // prevent this when the caller's GOT is not patched, eg. a library
-  // constructor running inside dlopen (Go c-shared runtime init does this).
+  // self-deadlock, and hooking pthread_getattr_np cannot detect this when the
+  // caller's GOT is not patched, eg. a library constructor running inside
+  // dlopen (Go c-shared runtime init does this).
   state->stack_bounds =
       lazy ? retrieve_stack_bounds_from_maps() : retrieve_stack_bounds();
   state->remaining_bytes -= next_sample_interval(state->gen);
@@ -591,20 +587,6 @@ void AllocationTracker::notify_fork() {
     return;
   }
   tl_state->tid = ddprof::gettid();
-}
-
-void AllocationTracker::notify_pthread_getattr_np() {
-  auto &state = get_tl_state_no_init();
-  if (!state.initialized) {
-    state.reentry_guard = true;
-  }
-}
-
-void AllocationTracker::notify_pthread_getattr_np_end() {
-  auto &state = get_tl_state_no_init();
-  if (!state.initialized) {
-    state.reentry_guard = false;
-  }
 }
 
 } // namespace ddprof
