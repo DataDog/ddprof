@@ -728,6 +728,16 @@ TEST(allocation_tracker, tl_state_stack_bounds_source) {
   EXPECT_LE(thread_start.stack_bounds.data() + thread_start.stack_bounds.size(),
             stack.data() + stack.size());
 
+  // Callers outside hooks (eg. MaybeReentryGuard) also use pthread_getattr_np.
+  TlStateResult get_or_init;
+  run_on_custom_stack<[](TlStateResult &res) {
+    res.stack_bounds = AllocationTracker::get_or_init_tl_state()->stack_bounds;
+  }>(stack, get_or_init);
+  EXPECT_FALSE(get_or_init.initialized_before);
+  EXPECT_GE(get_or_init.stack_bounds.data(), stack.data());
+  EXPECT_LE(get_or_init.stack_bounds.data() + get_or_init.stack_bounds.size(),
+            stack.data() + stack.size());
+
   // Lazy init from an allocation hook uses /proc/self/maps.
   TlStateResult lazy;
   run_on_custom_stack<[](TlStateResult &res) {

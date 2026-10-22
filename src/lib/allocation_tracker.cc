@@ -88,6 +88,11 @@ AllocationTracker::get_tl_state(bool lazy_init_if_needed) {
   return nullptr;
 }
 
+TrackerThreadLocalState *AllocationTracker::get_or_init_tl_state() {
+  TrackerThreadLocalState *state = get_tl_state();
+  return state ? state : init_tl_state();
+}
+
 TrackerThreadLocalState *AllocationTracker::init_tl_state_internal(bool lazy) {
   // Placement new into TLS -- no heap allocation, no cleanup needed on thread
   // exit. Safe to call after fork (TLS memory is inherited by child).
@@ -99,10 +104,14 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state_internal(bool lazy) {
   // self-deadlock, and hooking pthread_getattr_np cannot detect this when the
   // caller's GOT is not patched, eg. a library constructor running inside
   // dlopen (Go c-shared runtime init does this).
-  // Known limits of the maps-based bounds, acceptable for these threads (they
-  // were not profiled at all before lazy init existed): they describe the
-  // stack in use at the first allocation (wrong if that is a fiber or signal
-  // stack), and are empty if /proc is not available.
+  // This trades exactness for safety on threads started before profiling or
+  // without our pthread_create hook: before lazy init (#531) they were not
+  // profiled at all, and #531 gave them exact pthread_getattr_np bounds at the
+  // cost of this deadlock. Known limits of the maps-based bounds: they describe
+  // the stack in use at the first allocation (wrong if that is a fiber or
+  // signal stack), the upper bound can include the TCB/static TLS or the rest
+  // of a user-supplied stack mapping, and they are empty if /proc is not
+  // available.
   state->stack_bounds =
       lazy ? retrieve_stack_bounds_from_maps() : retrieve_stack_bounds();
   state->remaining_bytes -= next_sample_interval(state->gen);
@@ -221,13 +230,8 @@ void AllocationTracker::allocation_tracking_free() {
   if (!instance) {
     return;
   }
-  TrackerThreadLocalState *tl_state = get_tl_state();
-  if (unlikely(!tl_state)) {
-    LG_DBG("Unable to get tl_state during allocation_tracking_free");
-    instance->free();
-    return;
-  }
-  ReentryGuard const guard(&tl_state->reentry_guard);
+  TrackerThreadLocalState *tl_state = get_or_init_tl_state();
+  ReentryGuard const guard(tl_state ? &tl_state->reentry_guard : nullptr);
   std::lock_guard const lock{instance->_state.mutex};
   instance->free();
 }
@@ -570,8 +574,7 @@ AllocationTracker::next_sample_interval(std::minstd_rand &gen) const {
 }
 
 void AllocationTracker::notify_thread_start() {
-  // Not inside an allocation hook: use pthread_getattr_np for exact bounds.
-  if (unlikely(!get_tl_state() && !init_tl_state())) {
+  if (unlikely(!get_or_init_tl_state())) {
     LG_DBG("Unable to start allocation profiling on thread %d",
            ddprof::gettid());
   }

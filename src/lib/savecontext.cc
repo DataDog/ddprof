@@ -9,13 +9,13 @@
 #include "defer.hpp"
 #include "pthread_fixes.hpp"
 #include "saveregisters.hpp"
-#include "syscalls.hpp"
 
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/auxv.h>
 #include <sys/resource.h>
 #include <unistd.h>
 
@@ -40,17 +40,18 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
 }
 
 namespace {
-struct AddressRange {
+struct Mapping {
   uintptr_t start;
   uintptr_t end;
+  uintptr_t prev_end; // end of the mapping just below, 0 if none
 };
 
 constexpr uintptr_t hex_digit(char c) {
   return c <= '9' ? c - '0' : c - 'a' + 10;
 }
 
-// Returns the /proc/self/maps mapping containing addr, or {0, 0}.
-AddressRange find_mapping(uintptr_t addr) {
+// Returns the /proc/self/maps mapping containing addr, or zeros.
+Mapping find_mapping(uintptr_t addr) {
   const int fd = ::open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
   if (fd < 0) {
     return {};
@@ -62,7 +63,7 @@ AddressRange find_mapping(uintptr_t addr) {
   // buffer avoids heap allocation and keeps the hook's stack usage low.
   enum class Field : uint8_t { kStart, kEnd, kRestOfLine };
   Field field = Field::kStart;
-  AddressRange range{};
+  Mapping range{};
   char buf[256];
   ssize_t n;
   while ((n = ::read(fd, buf, sizeof(buf))) != 0) {
@@ -75,7 +76,7 @@ AddressRange find_mapping(uintptr_t addr) {
     for (const char c : std::span{buf, static_cast<size_t>(n)}) {
       if (c == '\n') {
         field = Field::kStart;
-        range = {};
+        range = {.start = 0, .end = 0, .prev_end = range.end};
       } else if (field == Field::kStart) {
         if (c == '-') {
           field = Field::kEnd;
@@ -109,16 +110,23 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
     return {};
   }
   // The main thread [stack] mapping only covers what has been used so far;
-  // like glibc's pthread_getattr_np, extend it down to the rlimit size so that
+  // like glibc's pthread_getattr_np, extend it down to the rlimit size, capped
+  // by the mapping below (which also covers an unlimited rlimit), so that
   // deeper stacks later still pass save_stack's bounds check. Only the lower
   // bound moves, so no unmapped memory is ever copied.
-  rlimit stack_limit;
-  if (ddprof::gettid() == ::getpid() &&
-      ::getrlimit(RLIMIT_STACK, &stack_limit) == 0 &&
-      stack_limit.rlim_cur != RLIM_INFINITY &&
-      stack_limit.rlim_cur < range.end) {
-    range.start = std::min(
-        range.start, range.end - static_cast<uintptr_t>(stack_limit.rlim_cur));
+  // The kernel puts the AT_EXECFN string at the top of the initial stack, so
+  // this only applies when we are on that stack, not on a fiber/signal stack.
+  const auto execfn = static_cast<uintptr_t>(getauxval(AT_EXECFN));
+  if (range.start <= execfn && execfn < range.end) {
+    uintptr_t low = range.prev_end;
+    rlimit stack_limit;
+    if (::getrlimit(RLIMIT_STACK, &stack_limit) == 0 &&
+        stack_limit.rlim_cur != RLIM_INFINITY &&
+        stack_limit.rlim_cur < range.end) {
+      low = std::max(low,
+                     range.end - static_cast<uintptr_t>(stack_limit.rlim_cur));
+    }
+    range.start = std::min(range.start, low);
   }
   return {reinterpret_cast<const std::byte *>(range.start),
           reinterpret_cast<const std::byte *>(range.end)};

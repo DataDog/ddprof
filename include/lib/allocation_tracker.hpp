@@ -81,6 +81,10 @@ public:
   static TrackerThreadLocalState *
   get_tl_state(bool lazy_init_if_needed = false);
 
+  // For callers outside allocation hooks: initializes the state with
+  // pthread_getattr_np if needed. Returns null if tracking is not active.
+  static TrackerThreadLocalState *get_or_init_tl_state();
+
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
   TrackerThreadLocalState *init_tl_state_internal(bool lazy = false);
