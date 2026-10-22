@@ -87,29 +87,35 @@ AllocationTracker::get_tl_state(bool init_if_not_initialized) {
     return &state;
   }
   if (init_if_not_initialized && !state.reentry_guard) {
-    // We are not inside pthread_getattr_np, so we can initialize the state
-    return init_tl_state();
+    return init_tl_state(/*lazy=*/true);
   }
   return nullptr;
 }
 
-TrackerThreadLocalState *AllocationTracker::init_tl_state_internal() {
+TrackerThreadLocalState *AllocationTracker::init_tl_state_internal(bool lazy) {
   // Placement new into TLS -- no heap allocation, no cleanup needed on thread
   // exit. Safe to call after fork (TLS memory is inherited by child).
   auto *state = new (ddprof_lib_state) TrackerThreadLocalState{};
   state->tid = ddprof::gettid();
-  state->stack_bounds = retrieve_stack_bounds();
+  // Lazy init runs inside an allocation hook, which may have been reached from
+  // glibc's pthread_getattr_np while it holds this thread's lock (it calls
+  // realloc under that lock). Calling pthread_getattr_np again here would
+  // self-deadlock. The reentry_guard set by our pthread_getattr_np hook cannot
+  // prevent this when the caller's GOT is not patched, eg. a library
+  // constructor running inside dlopen (Go c-shared runtime init does this).
+  state->stack_bounds =
+      lazy ? retrieve_stack_bounds_from_maps() : retrieve_stack_bounds();
   state->remaining_bytes -= next_sample_interval(state->gen);
   return state;
 }
 
-TrackerThreadLocalState *AllocationTracker::init_tl_state() {
+TrackerThreadLocalState *AllocationTracker::init_tl_state(bool lazy) {
   AllocationTracker *instance = get_instance();
   if (!instance) {
     return nullptr;
   }
 
-  return instance->init_tl_state_internal();
+  return instance->init_tl_state_internal(lazy);
 }
 
 AllocationTracker::AllocationTracker() = default;

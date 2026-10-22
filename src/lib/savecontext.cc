@@ -11,8 +11,12 @@
 #include "saveregisters.hpp"
 
 #include <algorithm>
+#include <cerrno>
+#include <charconv>
 #include <cstring>
+#include <fcntl.h>
 #include <pthread.h>
+#include <unistd.h>
 
 namespace ddprof {
 
@@ -32,6 +36,72 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
   }
   return {static_cast<std::byte *>(stack_addr),
           static_cast<std::byte *>(stack_addr) + stack_size};
+}
+
+namespace {
+// Parses a "<start>-<end> ..." /proc/self/maps line prefix.
+bool parse_maps_range(const char *line, const char *end, uintptr_t &start,
+                      uintptr_t &stop) {
+  auto [p, ec] = std::from_chars(line, end, start, 16);
+  if (ec != std::errc{} || p == end || *p != '-') {
+    return false;
+  }
+  auto [p2, ec2] = std::from_chars(p + 1, end, stop, 16);
+  return ec2 == std::errc{} && p2 != p + 1;
+}
+} // namespace
+
+DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
+  const auto sp = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+  const int fd = ::open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
+  if (fd < 0) {
+    return {};
+  }
+  defer { ::close(fd); };
+
+  // Fixed stack buffer: no heap allocation. Lines longer than the buffer only
+  // need their leading address range, so the remainder is skipped.
+  char buf[4096];
+  size_t len = 0;
+  bool skip_to_eol = false;
+  uintptr_t start;
+  uintptr_t stop;
+  auto contains_sp = [&](const char *line, const char *end) {
+    return !skip_to_eol && parse_maps_range(line, end, start, stop) &&
+        start <= sp && sp < stop;
+  };
+  while (true) {
+    const ssize_t n = ::read(fd, buf + len, sizeof(buf) - len);
+    if (n < 0 && errno == EINTR) {
+      continue;
+    }
+    if (n <= 0) {
+      return {};
+    }
+    len += static_cast<size_t>(n);
+    const char *line = buf;
+    const char *const end = buf + len;
+    while (const char *eol = static_cast<const char *>(
+               memchr(line, '\n', static_cast<size_t>(end - line)))) {
+      if (contains_sp(line, eol)) {
+        return {reinterpret_cast<const std::byte *>(start),
+                reinterpret_cast<const std::byte *>(stop)};
+      }
+      skip_to_eol = false;
+      line = eol + 1;
+    }
+    size_t remaining = static_cast<size_t>(end - line);
+    if (remaining == sizeof(buf)) {
+      if (contains_sp(line, end)) {
+        return {reinterpret_cast<const std::byte *>(start),
+                reinterpret_cast<const std::byte *>(stop)};
+      }
+      skip_to_eol = true;
+      remaining = 0;
+    }
+    memmove(buf, line, remaining);
+    len = remaining;
+  }
 }
 
 namespace {

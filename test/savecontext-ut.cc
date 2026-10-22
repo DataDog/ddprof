@@ -116,4 +116,34 @@ TEST(getcontext, unwind_from_sighandler) {
 }
 #endif
 
+namespace {
+bool contains(std::span<const std::byte> bounds, const void *addr) {
+  const auto *p = static_cast<const std::byte *>(addr);
+  return !bounds.empty() && bounds.data() <= p &&
+      p < bounds.data() + bounds.size();
+}
+} // namespace
+
+TEST(retrieve_stack_bounds_from_maps, main_thread) {
+  int local = 0;
+  auto bounds = retrieve_stack_bounds_from_maps();
+  EXPECT_TRUE(contains(bounds, &local));
+}
+
+TEST(retrieve_stack_bounds_from_maps, secondary_thread) {
+  std::thread t([] {
+    int local = 0;
+    auto maps_bounds = retrieve_stack_bounds_from_maps();
+    auto pthread_bounds = retrieve_stack_bounds();
+    EXPECT_TRUE(contains(maps_bounds, &local));
+    ASSERT_FALSE(pthread_bounds.empty());
+    // The mapping holding the thread stack also holds its TCB/static TLS, so
+    // it encloses the pthread-reported stack.
+    EXPECT_LE(maps_bounds.data(), pthread_bounds.data());
+    EXPECT_GE(maps_bounds.data() + maps_bounds.size(),
+              pthread_bounds.data() + pthread_bounds.size());
+  });
+  t.join();
+}
+
 } // namespace ddprof

@@ -18,6 +18,15 @@ namespace ddprof {
    Return an empty span in case of failure.*/
 DDPROF_NOIPO std::span<const std::byte> retrieve_stack_bounds();
 
+/**Retrieve the bounds of the memory mapping that contains the current stack
+   pointer, by reading /proc/self/maps.
+   Unlike retrieve_stack_bounds, this neither allocates nor takes any pthread
+   lock, so it is safe to call from inside allocation hooks, even when the hook
+   was reached from within glibc's pthread_getattr_np (which calls realloc
+   while holding the thread's lock).
+   Return an empty span in case of failure.*/
+DDPROF_NOIPO std::span<const std::byte> retrieve_stack_bounds_from_maps();
+
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
 DDPROF_NOIPO size_t

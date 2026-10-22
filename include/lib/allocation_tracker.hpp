@@ -72,7 +72,10 @@ public:
 
   static inline bool is_deallocation_tracking_active();
 
-  static TrackerThreadLocalState *init_tl_state();
+  // lazy: true when called from an allocation hook on a thread whose state
+  // was never initialized (eg. a thread started before profiling, or created
+  // by a library constructor running inside dlopen).
+  static TrackerThreadLocalState *init_tl_state(bool lazy = false);
 
   // can return null if initialization failed/is not possible
   static TrackerThreadLocalState *
@@ -83,7 +86,7 @@ public:
 
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
-  TrackerThreadLocalState *init_tl_state_internal();
+  TrackerThreadLocalState *init_tl_state_internal(bool lazy = false);
   static AllocationTracker *get_instance() {
     return _instance.load(std::memory_order_acquire);
   }
