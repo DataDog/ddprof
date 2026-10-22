@@ -73,10 +73,9 @@ private:
 
 template <bool mmap_alloc> class AllocTrackerHelperImpl {
 public:
-  // Do not try to initialize the TLS state when intercepting
-  // mmap/mmap64/munmap/munmap_ because those functions might be called from
-  // malloc implementation and cause a deadlock when pthread_getattr_np (which
-  // can call malloc) is called by tls state initialization.
+  // Lazily initialize the TLS state for threads ddprof did not see start
+  // (see AllocationTracker::init_tl_state). mmap/mmap64/munmap/munmap_ hooks
+  // can run inside the malloc implementation, so they never initialize it.
   AllocTrackerHelperImpl()
       : _tl_state{ddprof::AllocationTracker::get_tl_state(!mmap_alloc)},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
@@ -744,20 +743,15 @@ void *my_start(void *arg) {
   return start_routine(start_arg);
 }
 
-/** Hook pthread_create to cache stack end address just after thread start.
+/** Hook pthread_create to initialize the thread state (including stack
+ * bounds, via pthread_getattr_np) just after thread start, before user code.
  *
- * The rationale is to fix a deadlock that occurs when user code in created
- * thread calls pthread_getattr:
- * - pthread_getattr takes a lock in pthread object
- * - pthread_getattr itself does an allocation
- * - AllocationTracker tracks the allocation and calls save_context
- * - save_context calls pthread_getattr to get stack end address
- * - pthread_getattr is reentered and attempts to take the lock again leading to
- * a deadlock.
- *
- * Workaround is to hook pthread_create and call `cache_stack_end` to
- * cache stack end address while temporarily disabling allocation profiling for
- * current thread before calling user code.
+ * Getting stack bounds with pthread_getattr_np from an allocation hook can
+ * deadlock: pthread_getattr_np takes a lock in the pthread object and
+ * allocates while holding it, so an allocation hook calling it again on the
+ * same thread blocks forever. Threads not started through this hook get their
+ * bounds lazily from /proc/self/maps instead (see
+ * AllocationTracker::init_tl_state).
  * */
 struct PthreadCreateHook : HookBase {
   static constexpr auto name = "pthread_create";

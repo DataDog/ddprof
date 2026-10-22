@@ -72,12 +72,14 @@ public:
 
   // lazy: true when called from an allocation hook on a thread whose state
   // was never initialized (eg. a thread started before profiling, or created
-  // by a library constructor running inside dlopen).
+  // by a library constructor running inside dlopen). Stack bounds then come
+  // from /proc/self/maps instead of pthread_getattr_np.
   static TrackerThreadLocalState *init_tl_state(bool lazy = false);
 
-  // can return null if initialization failed/is not possible
+  // Returns null if the state is not initialized, unless
+  // lazy_init_if_needed is set (only allocation hooks should set it).
   static TrackerThreadLocalState *
-  get_tl_state(bool init_if_not_initialized = true);
+  get_tl_state(bool lazy_init_if_needed = false);
 
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;

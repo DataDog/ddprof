@@ -9,12 +9,14 @@
 #include "defer.hpp"
 #include "pthread_fixes.hpp"
 #include "saveregisters.hpp"
+#include "syscalls.hpp"
 
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
 #include <fcntl.h>
 #include <pthread.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 namespace ddprof {
@@ -38,13 +40,17 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
 }
 
 namespace {
+struct AddressRange {
+  uintptr_t start;
+  uintptr_t end;
+};
+
 constexpr uintptr_t hex_digit(char c) {
   return c <= '9' ? c - '0' : c - 'a' + 10;
 }
-} // namespace
 
-DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
-  const auto sp = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+// Returns the /proc/self/maps mapping containing addr, or {0, 0}.
+AddressRange find_mapping(uintptr_t addr) {
   const int fd = ::open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
   if (fd < 0) {
     return {};
@@ -52,13 +58,12 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
   defer { ::close(fd); };
 
   // Each line starts with "<start>-<end> " in lowercase hex; only that prefix
-  // is parsed, the rest of the line is skipped. Streaming over a fixed stack
-  // buffer avoids any heap allocation.
+  // is parsed, the rest of the line is skipped. Streaming over a small stack
+  // buffer avoids heap allocation and keeps the hook's stack usage low.
   enum class Field : uint8_t { kStart, kEnd, kRestOfLine };
   Field field = Field::kStart;
-  uintptr_t start = 0;
-  uintptr_t end = 0;
-  char buf[4096];
+  AddressRange range{};
+  char buf[256];
   ssize_t n;
   while ((n = ::read(fd, buf, sizeof(buf))) != 0) {
     if (n < 0) {
@@ -70,27 +75,53 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
     for (const char c : std::span{buf, static_cast<size_t>(n)}) {
       if (c == '\n') {
         field = Field::kStart;
-        start = end = 0;
+        range = {};
       } else if (field == Field::kStart) {
         if (c == '-') {
           field = Field::kEnd;
         } else {
-          start = (start << 4) | hex_digit(c);
+          range.start = (range.start << 4) | hex_digit(c);
         }
       } else if (field == Field::kEnd) {
         if (c == ' ') {
-          if (start <= sp && sp < end) {
-            return {reinterpret_cast<const std::byte *>(start),
-                    reinterpret_cast<const std::byte *>(end)};
+          if (range.start <= addr && addr < range.end) {
+            return range;
           }
           field = Field::kRestOfLine;
         } else {
-          end = (end << 4) | hex_digit(c);
+          range.end = (range.end << 4) | hex_digit(c);
         }
       }
     }
   }
   return {};
+}
+} // namespace
+
+DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
+  // Called from allocation hooks: the caller's errno must survive.
+  const int saved_errno = errno;
+  defer { errno = saved_errno; };
+
+  auto range =
+      find_mapping(reinterpret_cast<uintptr_t>(__builtin_frame_address(0)));
+  if (range.start == range.end) {
+    return {};
+  }
+  // The main thread [stack] mapping only covers what has been used so far;
+  // like glibc's pthread_getattr_np, extend it down to the rlimit size so that
+  // deeper stacks later still pass save_stack's bounds check. Only the lower
+  // bound moves, so no unmapped memory is ever copied.
+  rlimit stack_limit;
+  if (ddprof::gettid() == ::getpid() &&
+      ::getrlimit(RLIMIT_STACK, &stack_limit) == 0 &&
+      stack_limit.rlim_cur != RLIM_INFINITY &&
+      stack_limit.rlim_cur < range.end) {
+    range.start = std::min(
+        range.start, range.end - static_cast<uintptr_t>(stack_limit.rlim_cur));
+  }
+  return {reinterpret_cast<const std::byte *>(range.start),
+          reinterpret_cast<const std::byte *>(range.end)};
 }
 
 namespace {

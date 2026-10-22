@@ -14,8 +14,10 @@
 #include "unwind.hpp"
 
 #include <algorithm>
+#include <cerrno>
 #include <condition_variable>
 #include <mutex>
+#include <sys/resource.h>
 #include <thread>
 #include <unistd.h>
 
@@ -124,18 +126,33 @@ bool contains(std::span<const std::byte> bounds, const void *addr) {
 }
 } // namespace
 
+// __builtin_frame_address is used instead of the address of a local, which
+// ASAN's fake stack mode can move to the heap.
+
 TEST(retrieve_stack_bounds_from_maps, main_thread) {
-  int local = 0;
   auto bounds = retrieve_stack_bounds_from_maps();
-  EXPECT_TRUE(contains(bounds, &local));
+  EXPECT_TRUE(contains(bounds, __builtin_frame_address(0)));
+
+  // Like pthread_getattr_np, the lower bound is extended to the rlimit size.
+  rlimit stack_limit;
+  ASSERT_EQ(getrlimit(RLIMIT_STACK, &stack_limit), 0);
+  if (stack_limit.rlim_cur != RLIM_INFINITY) {
+    EXPECT_GE(bounds.size(), stack_limit.rlim_cur);
+  }
+}
+
+TEST(retrieve_stack_bounds_from_maps, preserves_errno) {
+  errno = ENOMEM;
+  auto bounds = retrieve_stack_bounds_from_maps();
+  EXPECT_FALSE(bounds.empty());
+  EXPECT_EQ(errno, ENOMEM);
 }
 
 TEST(retrieve_stack_bounds_from_maps, secondary_thread) {
   std::thread t([] {
-    int local = 0;
     auto maps_bounds = retrieve_stack_bounds_from_maps();
     auto pthread_bounds = retrieve_stack_bounds();
-    EXPECT_TRUE(contains(maps_bounds, &local));
+    EXPECT_TRUE(contains(maps_bounds, __builtin_frame_address(0)));
     ASSERT_FALSE(pthread_bounds.empty());
     // The mapping holding the thread stack also holds its TCB/static TLS, so
     // it encloses the pthread-reported stack.
