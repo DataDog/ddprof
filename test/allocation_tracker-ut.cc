@@ -182,9 +182,9 @@ TEST(allocation_tracker, thread_start) {
   defer { AllocationTracker::allocation_tracking_free(); };
 
   std::thread t([] {
-    EXPECT_EQ(AllocationTracker::get_tl_state(false), nullptr);
+    EXPECT_EQ(AllocationTracker::get_tl_state(), nullptr);
     AllocationTracker::notify_thread_start();
-    auto *state = AllocationTracker::get_tl_state(false);
+    auto *state = AllocationTracker::get_tl_state();
     ASSERT_NE(state, nullptr);
     const auto bounds = retrieve_stack_bounds();
     ASSERT_FALSE(bounds.empty());
@@ -195,7 +195,21 @@ TEST(allocation_tracker, thread_start) {
     constexpr int64_t kRemainingBytes = -12345;
     state->remaining_bytes = kRemainingBytes;
     AllocationTracker::notify_thread_start();
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), state);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
+              state);
     EXPECT_EQ(state->remaining_bytes, kRemainingBytes);
+  });
+  t.join();
+}
+
+TEST(allocation_tracker, lookup_without_tracking) {
+  ASSERT_FALSE(AllocationTracker::is_active());
+  std::thread t([] {
+    EXPECT_EQ(AllocationTracker::get_tl_state(), nullptr);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), nullptr);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
+              nullptr);
   });
   t.join();
 }
@@ -766,16 +780,16 @@ TEST(allocation_tracker, tl_state_stack_bounds_source) {
   EXPECT_LE(get_or_init.stack_bounds.data() + get_or_init.stack_bounds.size(),
             stack.data() + stack.size());
 
-  // Lazy init from an allocation hook uses /proc/self/maps.
-  TlStateResult lazy;
+  // Initialization from an allocation hook uses /proc/self/maps.
+  TlStateResult alloc_hook;
   run_on_custom_stack<[](TlStateResult &res) {
     res.stack_bounds =
-        AllocationTracker::get_tl_state(/*lazy_init_if_needed=*/true)
+        AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true)
             ->stack_bounds;
-  }>(stack, lazy);
-  EXPECT_FALSE(lazy.initialized_before);
-  EXPECT_LE(lazy.stack_bounds.data(), mapping_span.data());
-  EXPECT_GE(lazy.stack_bounds.data() + lazy.stack_bounds.size(),
+  }>(stack, alloc_hook);
+  EXPECT_FALSE(alloc_hook.initialized_before);
+  EXPECT_LE(alloc_hook.stack_bounds.data(), mapping_span.data());
+  EXPECT_GE(alloc_hook.stack_bounds.data() + alloc_hook.stack_bounds.size(),
             mapping_span.data() + mapping_span.size());
 }
 

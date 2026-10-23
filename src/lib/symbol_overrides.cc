@@ -71,13 +71,18 @@ private:
   ddprof::ReentryGuard _guard;
 };
 
+template <bool mmap_alloc>
+TrackerThreadLocalState *get_tl_state_for_alloc_hook() {
+  // mmap hooks can run inside malloc, so they must not initialize TLS.
+  return mmap_alloc
+      ? AllocationTracker::get_tl_state()
+      : AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true);
+}
+
 template <bool mmap_alloc> class AllocTrackerHelperImpl {
 public:
-  // Lazily initialize the TLS state for threads ddprof did not see start
-  // (see AllocationTracker::init_tl_state). mmap/mmap64/munmap/munmap_ hooks
-  // can run inside the malloc implementation, so they never initialize it.
   AllocTrackerHelperImpl()
-      : _tl_state{ddprof::AllocationTracker::get_tl_state(!mmap_alloc)},
+      : _tl_state{get_tl_state_for_alloc_hook<mmap_alloc>()},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
   void track(void *ptr, size_t size) {
@@ -105,7 +110,7 @@ template <bool mmap_alloc = false> class DeallocTrackerHelperImpl {
 public:
   DeallocTrackerHelperImpl()
       : _tl_state{ddprof::AllocationTracker::is_deallocation_tracking_active()
-                      ? ddprof::AllocationTracker::get_tl_state(!mmap_alloc)
+                      ? get_tl_state_for_alloc_hook<mmap_alloc>()
                       : nullptr},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
@@ -751,7 +756,7 @@ void *my_start(void *arg) {
  * allocates while holding it, so an allocation hook calling it again on the
  * same thread blocks forever. Threads not started through this hook get their
  * bounds lazily from /proc/self/maps instead (see
- * AllocationTracker::init_tl_state).
+ * AllocationTracker::get_or_init_tl_state).
  * */
 struct PthreadCreateHook : HookBase {
   static constexpr auto name = "pthread_create";

@@ -26,7 +26,7 @@ struct TrackerThreadLocalState {
                                  // should not allocate because we might already
                                  // be inside an allocation)
 
-  // Set to true by placement new in init_tl_state().
+  // Set to true when constructing the state.
   // Zero-initialized (false) in a fresh thread's TLS before init.
   bool initialized{true};
 };

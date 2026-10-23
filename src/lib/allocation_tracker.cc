@@ -74,37 +74,32 @@ void reset_pevent(PEvent &pevent) {
 }
 } // namespace
 
-TrackerThreadLocalState *
-AllocationTracker::get_tl_state(bool lazy_init_if_needed) {
+TrackerThreadLocalState *AllocationTracker::get_tl_state() {
   // ddprof_lib_state is zero-initialized by libc for each new thread.
-  // After placement new (init_tl_state), initialized is set to true.
+  // Placement new sets initialized to true.
   auto *state = reinterpret_cast<TrackerThreadLocalState *>(ddprof_lib_state);
-  if (state->initialized) {
+  return state->initialized ? state : nullptr;
+}
+
+TrackerThreadLocalState *
+AllocationTracker::get_or_init_tl_state(bool from_alloc_hook) {
+  if (auto *state = get_tl_state()) {
     return state;
   }
-  if (lazy_init_if_needed) {
-    return init_tl_state(/*lazy=*/true);
-  }
-  return nullptr;
+  auto *instance = get_instance();
+  return instance ? instance->init_tl_state_internal(from_alloc_hook) : nullptr;
 }
 
-TrackerThreadLocalState *AllocationTracker::get_or_init_tl_state() {
-  TrackerThreadLocalState *state = get_tl_state();
-  return state ? state : init_tl_state();
-}
-
-TrackerThreadLocalState *AllocationTracker::init_tl_state_internal(bool lazy) {
+TrackerThreadLocalState *
+AllocationTracker::init_tl_state_internal(bool from_alloc_hook) {
   // Placement new into TLS -- no heap allocation, no cleanup needed on thread
   // exit. Safe to call after fork (TLS memory is inherited by child).
   auto *state = new (ddprof_lib_state) TrackerThreadLocalState{};
   ReentryGuard const guard(&state->reentry_guard);
   state->tid = ddprof::gettid();
-  // Lazy init runs inside an allocation hook, which may have been reached from
-  // glibc's pthread_getattr_np while it holds this thread's lock (it calls
-  // realloc under that lock). Calling pthread_getattr_np again here would
-  // self-deadlock, and hooking pthread_getattr_np cannot detect this when the
-  // caller's GOT is not patched, eg. a library constructor running inside
-  // dlopen (Go c-shared runtime init does this).
+  // glibc's pthread_getattr_np calls realloc while holding this thread's lock.
+  // Calling it from an allocation hook would self-deadlock. Constructor calls
+  // can bypass our pthread hooks before the caller's GOT is patched.
   // This trades exactness for safety on threads started before profiling or
   // without our pthread_create hook: before lazy init (#531) they were not
   // profiled at all, and #531 gave them exact pthread_getattr_np bounds at the
@@ -113,19 +108,10 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state_internal(bool lazy) {
   // signal stack), the upper bound can include the TCB/static TLS or the rest
   // of a user-supplied stack mapping, and they are empty if /proc is not
   // available.
-  state->stack_bounds =
-      lazy ? retrieve_stack_bounds_from_maps() : retrieve_stack_bounds();
+  state->stack_bounds = from_alloc_hook ? retrieve_stack_bounds_from_maps()
+                                        : retrieve_stack_bounds();
   state->remaining_bytes -= next_sample_interval(state->gen);
   return state;
-}
-
-TrackerThreadLocalState *AllocationTracker::init_tl_state(bool lazy) {
-  AllocationTracker *instance = get_instance();
-  if (!instance) {
-    return nullptr;
-  }
-
-  return instance->init_tl_state_internal(lazy);
 }
 
 AllocationTracker::AllocationTracker() = default;
@@ -213,7 +199,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   _state.address_conflict_count = 0;
   _state.pid = getpid();
 
-  init_tl_state_internal();
+  init_tl_state_internal(/*from_alloc_hook=*/false);
 
   return {};
 }
