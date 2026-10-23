@@ -17,6 +17,7 @@
 #include <pthread.h>
 #include <sys/auxv.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 namespace ddprof {
@@ -47,16 +48,19 @@ struct Mapping {
 };
 
 constexpr uintptr_t hex_digit(char c) {
-  return c <= '9' ? c - '0' : c - 'a' + 10;
+  constexpr uintptr_t kLetterOffset = 10;
+  return c <= '9' ? c - '0' : c - 'a' + kLetterOffset;
 }
 
 // Returns the /proc/self/maps mapping containing addr, or zeros.
 Mapping find_mapping(uintptr_t addr) {
-  const int fd = ::open("/proc/self/maps", O_RDONLY | O_CLOEXEC);
+  // Avoid libc cancellation points inside noexcept allocation hooks.
+  const int fd = static_cast<int>(::syscall(
+      SYS_openat, AT_FDCWD, "/proc/self/maps", O_RDONLY | O_CLOEXEC, 0));
   if (fd < 0) {
     return {};
   }
-  defer { ::close(fd); };
+  defer { ::syscall(SYS_close, fd); };
 
   // Each line starts with "<start>-<end> " in lowercase hex; only that prefix
   // is parsed, the rest of the line is skipped. Streaming over a small stack
@@ -66,7 +70,7 @@ Mapping find_mapping(uintptr_t addr) {
   Mapping range{};
   char buf[256];
   ssize_t n;
-  while ((n = ::read(fd, buf, sizeof(buf))) != 0) {
+  while ((n = ::syscall(SYS_read, fd, buf, sizeof(buf))) != 0) {
     if (n < 0) {
       if (errno == EINTR) {
         continue;

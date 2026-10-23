@@ -19,6 +19,7 @@
 #include "pevent_lib.hpp"
 #include "reentry_guard.hpp"
 #include "ringbuffer_holder.hpp"
+#include "savecontext.hpp"
 #include "symbol_helper.hpp"
 #include "symbol_overrides.hpp"
 #include "syscalls.hpp"
@@ -170,6 +171,33 @@ TEST(allocation_tracker, start_stop) {
   }
   AllocationTracker::allocation_tracking_free();
   ASSERT_FALSE(AllocationTracker::is_active());
+}
+
+TEST(allocation_tracker, thread_start) {
+  const RingBufferHolder ring_buffer{kBufSizeOrder,
+                                     RingBufferType::kMPSCRingBuffer};
+  AllocationTracker::allocation_tracking_init(
+      kSamplingRate, AllocationTracker::kDeterministicSampling,
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
+  defer { AllocationTracker::allocation_tracking_free(); };
+
+  std::thread t([] {
+    EXPECT_EQ(AllocationTracker::get_tl_state(false), nullptr);
+    AllocationTracker::notify_thread_start();
+    auto *state = AllocationTracker::get_tl_state(false);
+    ASSERT_NE(state, nullptr);
+    const auto bounds = retrieve_stack_bounds();
+    ASSERT_FALSE(bounds.empty());
+    EXPECT_EQ(state->stack_bounds.data(), bounds.data());
+    EXPECT_EQ(state->stack_bounds.size(), bounds.size());
+    EXPECT_EQ(state->tid, ddprof::gettid());
+
+    constexpr int64_t kRemainingBytes = -12345;
+    state->remaining_bytes = kRemainingBytes;
+    AllocationTracker::notify_thread_start();
+    EXPECT_EQ(state->remaining_bytes, kRemainingBytes);
+  });
+  t.join();
 }
 
 TEST(allocation_tracker, stale_lock) {

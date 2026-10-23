@@ -14,6 +14,7 @@
 #include "unwind.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <condition_variable>
 #include <csignal>
@@ -195,6 +196,46 @@ TEST(retrieve_stack_bounds_from_maps, preserves_errno) {
   auto bounds = retrieve_stack_bounds_from_maps();
   EXPECT_FALSE(bounds.empty());
   EXPECT_EQ(errno, ENOMEM);
+}
+
+TEST(retrieve_stack_bounds_from_maps, preserves_errno_on_failure) {
+  rlimit limit;
+  ASSERT_EQ(getrlimit(RLIMIT_NOFILE, &limit), 0);
+  auto exhausted_limit = limit;
+  exhausted_limit.rlim_cur = 0;
+  ASSERT_EQ(setrlimit(RLIMIT_NOFILE, &exhausted_limit), 0);
+  std::span<const std::byte> bounds;
+  int call_errno;
+  {
+    defer { setrlimit(RLIMIT_NOFILE, &limit); };
+    errno = EDOM;
+    bounds = retrieve_stack_bounds_from_maps();
+    call_errno = errno;
+  }
+  EXPECT_TRUE(bounds.empty());
+  EXPECT_EQ(call_errno, EDOM);
+}
+
+TEST(retrieve_stack_bounds_from_maps, not_a_cancellation_point) {
+  std::atomic<bool> ready{false};
+  std::atomic<bool> proceed{false};
+  bool found_stack = false;
+  std::thread t([&] {
+    ready.store(true);
+    while (!proceed.load()) {}
+    // Allocation hooks are noexcept; cancellation must not unwind through them.
+    const auto bounds = []() noexcept {
+      return retrieve_stack_bounds_from_maps();
+    }();
+    pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, nullptr);
+    found_stack = contains(bounds, __builtin_frame_address(0));
+  });
+  while (!ready.load()) {}
+  const int cancel_result = pthread_cancel(t.native_handle());
+  proceed.store(true);
+  t.join();
+  EXPECT_EQ(cancel_result, 0);
+  EXPECT_TRUE(found_stack);
 }
 
 TEST(retrieve_stack_bounds_from_maps, secondary_thread) {

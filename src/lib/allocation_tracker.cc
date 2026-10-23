@@ -97,6 +97,7 @@ TrackerThreadLocalState *AllocationTracker::init_tl_state_internal(bool lazy) {
   // Placement new into TLS -- no heap allocation, no cleanup needed on thread
   // exit. Safe to call after fork (TLS memory is inherited by child).
   auto *state = new (ddprof_lib_state) TrackerThreadLocalState{};
+  ReentryGuard const guard(&state->reentry_guard);
   state->tid = ddprof::gettid();
   // Lazy init runs inside an allocation hook, which may have been reached from
   // glibc's pthread_getattr_np while it holds this thread's lock (it calls
