@@ -173,10 +173,27 @@ while ! awk '{print $3}' /proc/${pid}/stat | grep -q T; do
 done
 ./ddprof --pid ${pid} -e sCPU &
 ddprof_pid=$!
-# wait for ddprof to be ready
-sleep 0.5
+cleanup_attach() {
+    kill -SIGCONT "${pid}" 2>/dev/null || true
+    kill "${pid}" "${ddprof_pid}" 2>/dev/null || true
+    wait "${pid}" "${ddprof_pid}" 2>/dev/null || true
+}
+trap cleanup_attach EXIT
+
+# Perf events are enabled before this message is logged.
+startup_deadline=$((SECONDS + timeout_sec))
+while ! grep -Fq " ddprof[${ddprof_pid}]: Starting profiler" "${log_file}"; do
+    if ! kill -0 "${ddprof_pid}" 2>/dev/null || ((SECONDS >= startup_deadline)); then
+        echo "Profiler exited or timed out before becoming ready"
+        cat "${log_file}"
+        exit 1
+    fi
+    sleep 0.01
+done
 # resume simple_malloc process
 kill -SIGCONT ${pid}
+wait "${pid}"
 # wait for ddprof to finish
 wait ${ddprof_pid}
+trap - EXIT
 check_logs "./test/simple_malloc ${opts} --threads 2 --stop" 1 2 "cpu-time"
