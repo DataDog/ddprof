@@ -244,10 +244,12 @@ target_include_directories(dso-ut PRIVATE ${LIBCAP_INCLUDE_DIR})
 add_unit_test(tags-ut tags-ut.cc ../src/tags.cc ../src/thread_info.cc DEFINITIONS MYNAME="tags-ut")
 target_include_directories(tags-ut PRIVATE ${DOGFOOD_INCLUDE_DIR})
 
+add_library(unwind-module-fixture SHARED unwind_module_fixture.c)
+
 add_unit_test(
   dwfl_module-ut dwfl_module-ut.cc ${PROCESS_SRC} ../src/demangler/demangler.cc
   ../src/failed_assumption.cc ../src/user_override.cc
-  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle Datadog::Profiling
+  LIBRARIES ${ELFUTILS_LIBRARIES} llvm-demangle Datadog::Profiling unwind-module-fixture
   DEFINITIONS MYNAME="dwfl_module-ut")
 add_compile_definitions("DWFL_TEST_DATA=\"${CMAKE_CURRENT_SOURCE_DIR}/data\"")
 set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
