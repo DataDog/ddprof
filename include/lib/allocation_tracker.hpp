@@ -49,8 +49,6 @@ public:
 
   static void notify_thread_start();
   static void notify_fork();
-  static void notify_pthread_getattr_np();
-  static void notify_pthread_getattr_np_end();
 
   static DDRes allocation_tracking_init(uint64_t allocation_profiling_rate,
                                         uint32_t flags,
@@ -72,18 +70,17 @@ public:
 
   static inline bool is_deallocation_tracking_active();
 
-  static TrackerThreadLocalState *init_tl_state();
+  // Returns null if this thread's state has not been initialized.
+  static TrackerThreadLocalState *get_tl_state();
 
-  // can return null if initialization failed/is not possible
+  // Returns existing state, or initializes it while tracking is active.
+  // from_alloc_hook selects stack bounds that require no pthread locks.
   static TrackerThreadLocalState *
-  get_tl_state(bool init_if_not_initialized = true);
-
-  // does not init
-  static TrackerThreadLocalState &get_tl_state_no_init();
+  get_or_init_tl_state(bool from_alloc_hook = false);
 
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
-  TrackerThreadLocalState *init_tl_state_internal();
+  TrackerThreadLocalState *init_tl_state_internal(bool from_alloc_hook);
   static AllocationTracker *get_instance() {
     return _instance.load(std::memory_order_acquire);
   }

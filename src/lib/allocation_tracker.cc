@@ -74,42 +74,44 @@ void reset_pevent(PEvent &pevent) {
 }
 } // namespace
 
-TrackerThreadLocalState &AllocationTracker::get_tl_state_no_init() {
-  return *reinterpret_cast<TrackerThreadLocalState *>(ddprof_lib_state);
+TrackerThreadLocalState *AllocationTracker::get_tl_state() {
+  // ddprof_lib_state is zero-initialized by libc for each new thread.
+  // Placement new sets initialized to true.
+  auto *state = reinterpret_cast<TrackerThreadLocalState *>(ddprof_lib_state);
+  return state->initialized ? state : nullptr;
 }
 
 TrackerThreadLocalState *
-AllocationTracker::get_tl_state(bool init_if_not_initialized) {
-  // ddprof_lib_state is zero-initialized by libc for each new thread.
-  // After placement new (init_tl_state), initialized is set to true.
-  auto &state = get_tl_state_no_init();
-  if (state.initialized) {
-    return &state;
+AllocationTracker::get_or_init_tl_state(bool from_alloc_hook) {
+  if (auto *state = get_tl_state()) {
+    return state;
   }
-  if (init_if_not_initialized && !state.reentry_guard) {
-    // We are not inside pthread_getattr_np, so we can initialize the state
-    return init_tl_state();
-  }
-  return nullptr;
+  auto *instance = get_instance();
+  return instance ? instance->init_tl_state_internal(from_alloc_hook) : nullptr;
 }
 
-TrackerThreadLocalState *AllocationTracker::init_tl_state_internal() {
+TrackerThreadLocalState *
+AllocationTracker::init_tl_state_internal(bool from_alloc_hook) {
   // Placement new into TLS -- no heap allocation, no cleanup needed on thread
   // exit. Safe to call after fork (TLS memory is inherited by child).
   auto *state = new (ddprof_lib_state) TrackerThreadLocalState{};
+  ReentryGuard const guard(&state->reentry_guard);
   state->tid = ddprof::gettid();
-  state->stack_bounds = retrieve_stack_bounds();
+  // glibc's pthread_getattr_np calls realloc while holding this thread's lock.
+  // Calling it from an allocation hook would self-deadlock. Constructor calls
+  // can bypass our pthread hooks before the caller's GOT is patched.
+  // This trades exactness for safety on threads started before profiling or
+  // without our pthread_create hook: before lazy init (#531) they were not
+  // profiled at all, and #531 gave them exact pthread_getattr_np bounds at the
+  // cost of this deadlock. Known limits of the maps-based bounds: they describe
+  // the stack in use at the first allocation (wrong if that is a fiber or
+  // signal stack), the upper bound can include the TCB/static TLS or the rest
+  // of a user-supplied stack mapping, and they are empty if /proc is not
+  // available.
+  state->stack_bounds = from_alloc_hook ? retrieve_stack_bounds_from_maps()
+                                        : retrieve_stack_bounds();
   state->remaining_bytes -= next_sample_interval(state->gen);
   return state;
-}
-
-TrackerThreadLocalState *AllocationTracker::init_tl_state() {
-  AllocationTracker *instance = get_instance();
-  if (!instance) {
-    return nullptr;
-  }
-
-  return instance->init_tl_state_internal();
 }
 
 AllocationTracker::AllocationTracker() = default;
@@ -197,7 +199,7 @@ DDRes AllocationTracker::init(uint64_t mem_profile_interval,
   _state.address_conflict_count = 0;
   _state.pid = getpid();
 
-  init_tl_state_internal();
+  init_tl_state_internal(/*from_alloc_hook=*/false);
 
   return {};
 }
@@ -215,13 +217,8 @@ void AllocationTracker::allocation_tracking_free() {
   if (!instance) {
     return;
   }
-  TrackerThreadLocalState *tl_state = get_tl_state();
-  if (unlikely(!tl_state)) {
-    LG_DBG("Unable to get tl_state during allocation_tracking_free");
-    instance->free();
-    return;
-  }
-  ReentryGuard const guard(&tl_state->reentry_guard);
+  TrackerThreadLocalState *tl_state = get_or_init_tl_state();
+  ReentryGuard const guard(tl_state ? &tl_state->reentry_guard : nullptr);
   std::lock_guard const lock{instance->_state.mutex};
   instance->free();
 }
@@ -564,8 +561,7 @@ AllocationTracker::next_sample_interval(std::minstd_rand &gen) const {
 }
 
 void AllocationTracker::notify_thread_start() {
-  TrackerThreadLocalState *tl_state = get_tl_state();
-  if (unlikely(!tl_state)) {
+  if (unlikely(!get_or_init_tl_state())) {
     LG_DBG("Unable to start allocation profiling on thread %d",
            ddprof::gettid());
   }
@@ -585,20 +581,6 @@ void AllocationTracker::notify_fork() {
     return;
   }
   tl_state->tid = ddprof::gettid();
-}
-
-void AllocationTracker::notify_pthread_getattr_np() {
-  auto &state = get_tl_state_no_init();
-  if (!state.initialized) {
-    state.reentry_guard = true;
-  }
-}
-
-void AllocationTracker::notify_pthread_getattr_np_end() {
-  auto &state = get_tl_state_no_init();
-  if (!state.initialized) {
-    state.reentry_guard = false;
-  }
 }
 
 } // namespace ddprof
