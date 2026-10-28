@@ -196,6 +196,14 @@ add_unit_test(
   LIBRARIES DDProf::Parser CLI11
   DEFINITIONS MYNAME="presets-ut")
 
+add_library(symbolizer-source-fixture SHARED symbolizer_source_fixture.c)
+target_compile_options(symbolizer-source-fixture PRIVATE -g -O0)
+
+add_unit_test(
+  symbolizer-ut symbolizer-ut.cc ../src/ddog_profiling_utils.cc ../src/symbol_hdr.cc
+  ../src/symbolizer.cc ../src/demangler/demangler.cc LIBRARIES Datadog::Profiling llvm-demangle
+                                                               symbolizer-source-fixture dl)
+
 add_unit_test(
   ddprof_pprof-ut
   ddprof_pprof-ut.cc
