@@ -29,6 +29,7 @@
 
 #include <cstdlib>
 #include <gtest/gtest.h>
+#include <latch>
 #ifdef USE_JEMALLOC
 #  include <jemalloc/jemalloc.h>
 #else
@@ -686,6 +687,49 @@ DDPROF_NOINLINE void test_allocation_functions(RingBuffer &ring_buffer) {
         },
         [](auto ptr, size_t) { delete[] ptr; });
   }
+}
+
+DDPROF_NOINLINE void *map_for_thread_state_test(size_t size) {
+  return mmap(nullptr, size, PROT_READ | PROT_WRITE,
+              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+}
+
+TEST(allocation_tracker, mmap_initializes_thread_state) {
+  TscClock::init();
+  PerfClock::init();
+  RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
+  AllocationTracker::allocation_tracking_init(
+      kSamplingRate, AllocationTracker::kDeterministicSampling,
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
+  defer { AllocationTracker::allocation_tracking_free(); };
+  ASSERT_TRUE(AllocationTracker::is_active());
+
+  constexpr size_t kMappingSize = 4096;
+  std::latch ready{1};
+  std::latch proceed{1};
+  bool initialized_before = true;
+  bool initialized_after = false;
+  void *mapping = MAP_FAILED;
+  std::thread worker([&] {
+    ready.count_down();
+    proceed.wait();
+    initialized_before = AllocationTracker::get_tl_state() != nullptr;
+    mapping = map_for_thread_state_test(kMappingSize);
+    initialized_after = AllocationTracker::get_tl_state() != nullptr;
+    if (mapping != MAP_FAILED) {
+      munmap(mapping, kMappingSize);
+    }
+  });
+
+  ready.wait();
+  setup_overrides();
+  proceed.count_down();
+  worker.join();
+  restore_overrides();
+
+  EXPECT_FALSE(initialized_before);
+  EXPECT_NE(mapping, MAP_FAILED);
+  EXPECT_TRUE(initialized_after);
 }
 
 TEST(allocation_tracker, test_allocation_functions) {

@@ -71,18 +71,11 @@ private:
   ddprof::ReentryGuard _guard;
 };
 
-template <bool mmap_alloc>
-TrackerThreadLocalState *get_tl_state_for_alloc_hook() {
-  // mmap hooks can run inside malloc, so they must not initialize TLS.
-  return mmap_alloc
-      ? AllocationTracker::get_tl_state()
-      : AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true);
-}
-
 template <bool mmap_alloc> class AllocTrackerHelperImpl {
 public:
   AllocTrackerHelperImpl()
-      : _tl_state{get_tl_state_for_alloc_hook<mmap_alloc>()},
+      : _tl_state{AllocationTracker::get_or_init_tl_state(
+            /*from_alloc_hook=*/true)},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
   void track(void *ptr, size_t size) {
@@ -110,7 +103,8 @@ template <bool mmap_alloc = false> class DeallocTrackerHelperImpl {
 public:
   DeallocTrackerHelperImpl()
       : _tl_state{ddprof::AllocationTracker::is_deallocation_tracking_active()
-                      ? get_tl_state_for_alloc_hook<mmap_alloc>()
+                      ? AllocationTracker::get_or_init_tl_state(
+                            /*from_alloc_hook=*/true)
                       : nullptr},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
