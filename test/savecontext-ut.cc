@@ -240,15 +240,23 @@ TEST(retrieve_stack_bounds_from_maps, not_a_cancellation_point) {
 
 TEST(retrieve_stack_bounds_from_maps, secondary_thread) {
   std::thread t([] {
+    errno = EDOM;
     auto maps_bounds = retrieve_stack_bounds_from_maps();
+    EXPECT_EQ(errno, EDOM);
     auto pthread_bounds = retrieve_stack_bounds();
     EXPECT_TRUE(contains(maps_bounds, __builtin_frame_address(0)));
     ASSERT_FALSE(pthread_bounds.empty());
-    // The mapping holding the thread stack also holds its TCB/static TLS, so
-    // it encloses the pthread-reported stack.
     EXPECT_LE(maps_bounds.data(), pthread_bounds.data());
-    EXPECT_GE(maps_bounds.data() + maps_bounds.size(),
-              pthread_bounds.data() + pthread_bounds.size());
+    const auto frame = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+    const auto self = reinterpret_cast<uintptr_t>(pthread_self());
+    const auto end =
+        reinterpret_cast<uintptr_t>(maps_bounds.data() + maps_bounds.size());
+    if (frame < self && self <= end) {
+      EXPECT_EQ(end, self);
+    }
+    uint64_t saved_regs[k_nb_registers_to_unwind];
+    std::byte buffer[4096];
+    EXPECT_GT(save_context(maps_bounds, saved_regs, buffer), 0);
   });
   t.join();
 }

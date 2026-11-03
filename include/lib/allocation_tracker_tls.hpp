@@ -7,6 +7,12 @@
 
 namespace ddprof {
 
+enum class StackBoundsSource : uint8_t {
+  kUnset = 0,
+  kPthread,
+  kProcMaps,
+};
+
 struct TrackerThreadLocalState {
   int64_t remaining_bytes{0}; // remaining allocation bytes until next sample
   std::span<const std::byte> stack_bounds;
@@ -25,6 +31,8 @@ struct TrackerThreadLocalState {
                                  // (eg. when we are in mmap hook, we
                                  // should not allocate because we might already
                                  // be inside an allocation)
+
+  StackBoundsSource stack_bounds_source{StackBoundsSource::kUnset};
 
   // Set to true when constructing the state.
   // Zero-initialized (false) in a fresh thread's TLS before init.

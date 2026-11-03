@@ -60,7 +60,8 @@ std::mutex g_mutex;
 class MaybeReentryGuard {
 public:
   MaybeReentryGuard()
-      : _tl_state{ddprof::AllocationTracker::get_or_init_tl_state()},
+      : _tl_state{ddprof::AllocationTracker::
+                      get_or_init_tl_state_outside_alloc_hook()},
         _guard{_tl_state ? &(_tl_state->reentry_guard) : nullptr} {}
 
   explicit operator bool() const { return static_cast<bool>(_guard); }

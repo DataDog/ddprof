@@ -108,8 +108,8 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
   const int saved_errno = errno;
   defer { errno = saved_errno; };
 
-  auto range =
-      find_mapping(reinterpret_cast<uintptr_t>(__builtin_frame_address(0)));
+  const auto frame = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+  auto range = find_mapping(frame);
   if (range.start == range.end) {
     return {};
   }
@@ -131,6 +131,14 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
                      range.end - static_cast<uintptr_t>(stack_limit.rlim_cur));
     }
     range.start = std::min(range.start, low);
+  } else {
+    // Adjacent RW mappings can merge; cap at the thread descriptor when it is
+    // above the frame in this mapping. Separate TLS and alternate stacks may
+    // put the descriptor elsewhere.
+    const auto self = reinterpret_cast<uintptr_t>(pthread_self());
+    if (frame < self && self < range.end) {
+      range.end = self;
+    }
   }
   return {reinterpret_cast<const std::byte *>(range.start),
           reinterpret_cast<const std::byte *>(range.end)};
