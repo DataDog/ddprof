@@ -714,11 +714,12 @@ namespace {
 struct TlStateResult {
   bool initialized_before{true};
   std::span<const std::byte> stack_bounds;
+  const std::byte *self{nullptr};
 };
 
 // Starts a thread whose stack is a sub-range of a larger anonymous mapping:
-// pthread_getattr_np reports the sub-range, while the /proc/self/maps mapping
-// containing the stack is the whole mapping. This tells which source was used.
+// pthread_getattr_np reports the sub-range, while maps-based bounds start at
+// the whole mapping. This tells which source was used.
 template <void (*InitFn)(TlStateResult &)>
 void run_on_custom_stack(std::span<std::byte> stack, TlStateResult &result) {
   pthread_attr_t attr;
@@ -786,11 +787,19 @@ TEST(allocation_tracker, tl_state_stack_bounds_source) {
     res.stack_bounds =
         AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true)
             ->stack_bounds;
+    res.self = reinterpret_cast<const std::byte *>(pthread_self());
   }>(stack, alloc_hook);
   EXPECT_FALSE(alloc_hook.initialized_before);
   EXPECT_LE(alloc_hook.stack_bounds.data(), mapping_span.data());
-  EXPECT_GE(alloc_hook.stack_bounds.data() + alloc_hook.stack_bounds.size(),
-            mapping_span.data() + mapping_span.size());
+  const auto *end =
+      alloc_hook.stack_bounds.data() + alloc_hook.stack_bounds.size();
+  // musl maps the thread descriptor apart when it does not fit on the stack.
+  if (alloc_hook.self >= stack.data() &&
+      alloc_hook.self < stack.data() + stack.size()) {
+    EXPECT_EQ(end, alloc_hook.self);
+  } else {
+    EXPECT_GE(end, mapping_span.data() + mapping_span.size());
+  }
 }
 
 } // namespace ddprof

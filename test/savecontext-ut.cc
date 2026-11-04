@@ -141,14 +141,12 @@ TEST(retrieve_stack_bounds_from_maps, main_thread) {
   if (stack_limit.rlim_cur != RLIM_INFINITY) {
     EXPECT_GE(bounds.size(), stack_limit.rlim_cur);
   }
-#ifdef __GLIBC__
-  // Same lower bound as glibc: rlimit size, capped by the mapping below. glibc
-  // places the upper bound at the page of __libc_stack_end, within the mapping.
+  // Same lower bound as glibc, also on musl whose pthread_getattr_np stops at
+  // the mapped part of the stack.
   auto pthread_bounds = retrieve_stack_bounds();
   EXPECT_EQ(bounds.data(), pthread_bounds.data());
   EXPECT_GE(bounds.data() + bounds.size(),
             pthread_bounds.data() + pthread_bounds.size());
-#endif
 }
 
 namespace {
@@ -244,11 +242,9 @@ TEST(retrieve_stack_bounds_from_maps, secondary_thread) {
     auto pthread_bounds = retrieve_stack_bounds();
     EXPECT_TRUE(contains(maps_bounds, __builtin_frame_address(0)));
     ASSERT_FALSE(pthread_bounds.empty());
-    // The mapping holding the thread stack also holds its TCB/static TLS, so
-    // it encloses the pthread-reported stack.
     EXPECT_LE(maps_bounds.data(), pthread_bounds.data());
-    EXPECT_GE(maps_bounds.data() + maps_bounds.size(),
-              pthread_bounds.data() + pthread_bounds.size());
+    EXPECT_EQ(maps_bounds.data() + maps_bounds.size(),
+              reinterpret_cast<const std::byte *>(pthread_self()));
   });
   t.join();
 }
