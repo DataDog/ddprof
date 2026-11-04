@@ -78,9 +78,6 @@ public:
   static TrackerThreadLocalState *
   get_or_init_tl_state(bool from_alloc_hook = false);
 
-  // Only for callers outside allocation hooks; may refresh pthread bounds.
-  static TrackerThreadLocalState *get_or_init_tl_state_outside_alloc_hook();
-
 private:
   static constexpr unsigned k_ratio_max_elt_to_bitset_size = 16;
   TrackerThreadLocalState *init_tl_state_internal(bool from_alloc_hook);

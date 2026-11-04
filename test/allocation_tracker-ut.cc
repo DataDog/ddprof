@@ -224,7 +224,7 @@ TEST(allocation_tracker, thread_start) {
   t.join();
 }
 
-TEST(allocation_tracker, refresh_maps_bounds_outside_alloc_hooks) {
+TEST(allocation_tracker, retains_cached_maps_bounds) {
   const RingBufferHolder ring_buffer{kBufSizeOrder,
                                      RingBufferType::kMPSCRingBuffer};
   AllocationTracker::allocation_tracking_init(
@@ -232,110 +232,27 @@ TEST(allocation_tracker, refresh_maps_bounds_outside_alloc_hooks) {
       k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
   defer { AllocationTracker::allocation_tracking_free(); };
 
-  for (bool thread_start : {false, true}) {
-    std::thread t([thread_start] {
-      auto *state = AllocationTracker::get_or_init_tl_state(
-          /*from_alloc_hook=*/true);
-      ASSERT_NE(state, nullptr);
-      ASSERT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
-      const auto maps_bounds = state->stack_bounds;
-      const auto generator = state->gen;
-      constexpr int64_t kRemainingBytes = -12345;
-      state->remaining_bytes = kRemainingBytes;
-
-      EXPECT_EQ(
-          AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
-          state);
-      EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
-      EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), state);
-      EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
-      EXPECT_EQ(state->stack_bounds.data(), maps_bounds.data());
-      EXPECT_EQ(state->stack_bounds.size(), maps_bounds.size());
-      {
-        ReentryGuard const guard(&state->reentry_guard);
-        EXPECT_EQ(AllocationTracker::get_or_init_tl_state_outside_alloc_hook(),
-                  state);
-        EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
-      }
-
-      if (thread_start) {
-        AllocationTracker::notify_thread_start();
-      } else {
-        EXPECT_EQ(AllocationTracker::get_or_init_tl_state_outside_alloc_hook(),
-                  state);
-      }
-      EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kPthread);
-      const auto pthread_bounds = retrieve_stack_bounds();
-      ASSERT_FALSE(pthread_bounds.empty());
-      EXPECT_EQ(state->stack_bounds.data(), pthread_bounds.data());
-      EXPECT_EQ(state->stack_bounds.size(), pthread_bounds.size());
-      EXPECT_EQ(state->gen, generator);
-      EXPECT_EQ(state->remaining_bytes, kRemainingBytes);
-      EXPECT_EQ(state->tid, ddprof::gettid());
-      EXPECT_FALSE(state->reentry_guard);
-      EXPECT_TRUE(state->allocation_allowed);
-    });
-    t.join();
-  }
-}
-
-TEST(allocation_tracker, retain_initial_stack_maps_bounds) {
-  const RingBufferHolder ring_buffer{kBufSizeOrder,
-                                     RingBufferType::kMPSCRingBuffer};
-  AllocationTracker::allocation_tracking_init(
-      kSamplingRate, AllocationTracker::kDeterministicSampling,
-      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
-  defer { AllocationTracker::allocation_tracking_free(); };
-  auto *state = AllocationTracker::get_tl_state();
-  ASSERT_NE(state, nullptr);
-  state->stack_bounds = retrieve_stack_bounds_from_maps();
-  state->stack_bounds_source = StackBoundsSource::kProcMaps;
-  const auto maps_bounds = state->stack_bounds;
-  ASSERT_FALSE(maps_bounds.empty());
-
-  EXPECT_EQ(AllocationTracker::get_or_init_tl_state_outside_alloc_hook(),
-            state);
-  EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
-  EXPECT_EQ(state->stack_bounds.data(), maps_bounds.data());
-  EXPECT_EQ(state->stack_bounds.size(), maps_bounds.size());
-  EXPECT_FALSE(state->reentry_guard);
-}
-
-TEST(allocation_tracker, refresh_maps_bounds_with_hooks) {
-  TscClock::init();
-  PerfClock::init();
-  RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
-  AllocationTracker::allocation_tracking_init(
-      kSamplingRate, AllocationTracker::kDeterministicSampling,
-      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
-  defer { AllocationTracker::allocation_tracking_free(); };
-
-  std::latch ready{1};
-  std::latch proceed{1};
-  bool provisional_before = false;
-  bool refreshed = false;
-  bool guard_released = false;
-  std::thread worker([&] {
+  std::thread t([] {
     auto *state = AllocationTracker::get_or_init_tl_state(
         /*from_alloc_hook=*/true);
-    provisional_before =
-        state && state->stack_bounds_source == StackBoundsSource::kProcMaps;
-    ready.count_down();
-    proceed.wait();
-    auto *result = AllocationTracker::get_or_init_tl_state_outside_alloc_hook();
-    refreshed = result && result == state &&
-        result->stack_bounds_source == StackBoundsSource::kPthread &&
-        !result->stack_bounds.empty();
-    guard_released = result && !result->reentry_guard;
+    ASSERT_NE(state, nullptr);
+    ASSERT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
+    const auto bounds = state->stack_bounds;
+    const auto generator = state->gen;
+    constexpr int64_t kRemainingBytes = -12345;
+    state->remaining_bytes = kRemainingBytes;
+
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), state);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
+              state);
+    AllocationTracker::notify_thread_start();
+    EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
+    EXPECT_EQ(state->stack_bounds.data(), bounds.data());
+    EXPECT_EQ(state->stack_bounds.size(), bounds.size());
+    EXPECT_EQ(state->gen, generator);
+    EXPECT_EQ(state->remaining_bytes, kRemainingBytes);
   });
-  ready.wait();
-  setup_overrides();
-  proceed.count_down();
-  worker.join();
-  restore_overrides();
-  EXPECT_TRUE(provisional_before);
-  EXPECT_TRUE(refreshed);
-  EXPECT_TRUE(guard_released);
+  t.join();
 }
 
 #ifdef __GLIBC__
@@ -363,11 +280,9 @@ TEST(allocation_tracker, unset_bounds_after_failed_initial_discovery) {
   EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), state);
   EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
             state);
+  AllocationTracker::notify_thread_start();
+  EXPECT_TRUE(state->stack_bounds.empty());
   EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kUnset);
-  EXPECT_EQ(AllocationTracker::get_or_init_tl_state_outside_alloc_hook(),
-            state);
-  EXPECT_FALSE(state->stack_bounds.empty());
-  EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kPthread);
 
   std::thread t([&] {
     ASSERT_EQ(AllocationTracker::get_tl_state(), nullptr);
@@ -382,53 +297,13 @@ TEST(allocation_tracker, unset_bounds_after_failed_initial_discovery) {
     EXPECT_TRUE(worker_state->initialized);
     EXPECT_TRUE(worker_state->stack_bounds.empty());
     EXPECT_EQ(worker_state->stack_bounds_source, StackBoundsSource::kUnset);
-    EXPECT_EQ(AllocationTracker::get_or_init_tl_state_outside_alloc_hook(),
-              worker_state);
-    EXPECT_FALSE(worker_state->stack_bounds.empty());
-    EXPECT_EQ(worker_state->stack_bounds_source, StackBoundsSource::kPthread);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), worker_state);
+    EXPECT_TRUE(worker_state->stack_bounds.empty());
+    EXPECT_EQ(worker_state->stack_bounds_source, StackBoundsSource::kUnset);
   });
   t.join();
 }
 
-TEST(allocation_tracker, retry_failed_bounds_refresh) {
-  const RingBufferHolder ring_buffer{kBufSizeOrder,
-                                     RingBufferType::kMPSCRingBuffer};
-  AllocationTracker::allocation_tracking_init(
-      kSamplingRate, AllocationTracker::kDeterministicSampling,
-      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
-  defer { AllocationTracker::allocation_tracking_free(); };
-  auto *state = AllocationTracker::get_tl_state();
-  ASSERT_NE(state, nullptr);
-  rlimit limit;
-  ASSERT_EQ(getrlimit(RLIMIT_NOFILE, &limit), 0);
-  auto exhausted_limit = limit;
-  exhausted_limit.rlim_cur = 0;
-  // Exclude AT_EXECFN to exercise refresh rather than initial-stack retention.
-  const std::byte marker{};
-  for (const auto source :
-       {StackBoundsSource::kUnset, StackBoundsSource::kProcMaps}) {
-    state->stack_bounds = source == StackBoundsSource::kUnset
-        ? std::span<const std::byte>{}
-        : std::span<const std::byte>{&marker, 1};
-    state->stack_bounds_source = source;
-    const auto original_bounds = state->stack_bounds;
-    {
-      ASSERT_EQ(setrlimit(RLIMIT_NOFILE, &exhausted_limit), 0);
-      defer { setrlimit(RLIMIT_NOFILE, &limit); };
-      EXPECT_EQ(AllocationTracker::get_or_init_tl_state_outside_alloc_hook(),
-                state);
-    }
-    EXPECT_EQ(state->stack_bounds_source, source);
-    EXPECT_EQ(state->stack_bounds.data(), original_bounds.data());
-    EXPECT_EQ(state->stack_bounds.size(), original_bounds.size());
-    EXPECT_FALSE(state->reentry_guard);
-    EXPECT_EQ(AllocationTracker::get_or_init_tl_state_outside_alloc_hook(),
-              state);
-    EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kPthread);
-    EXPECT_FALSE(state->stack_bounds.empty());
-    EXPECT_FALSE(state->reentry_guard);
-  }
-}
 #endif
 
 TEST(allocation_tracker, lookup_without_tracking) {
@@ -437,8 +312,6 @@ TEST(allocation_tracker, lookup_without_tracking) {
     EXPECT_EQ(AllocationTracker::get_tl_state(), nullptr);
     EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), nullptr);
     EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
-              nullptr);
-    EXPECT_EQ(AllocationTracker::get_or_init_tl_state_outside_alloc_hook(),
               nullptr);
   });
   t.join();

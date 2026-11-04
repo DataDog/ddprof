@@ -25,7 +25,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <new>
-#include <sys/auxv.h>
 #include <unistd.h>
 
 namespace ddprof {
@@ -89,34 +88,6 @@ AllocationTracker::get_or_init_tl_state(bool from_alloc_hook) {
   }
   auto *instance = get_instance();
   return instance ? instance->init_tl_state_internal(from_alloc_hook) : nullptr;
-}
-
-TrackerThreadLocalState *
-AllocationTracker::get_or_init_tl_state_outside_alloc_hook() {
-  auto *state = get_tl_state();
-  if (!state) {
-    return get_or_init_tl_state();
-  }
-  if (state->stack_bounds_source == StackBoundsSource::kPthread ||
-      !is_active()) {
-    return state;
-  }
-  ReentryGuard const guard(&state->reentry_guard);
-  if (!guard) {
-    return state;
-  }
-  const auto begin = reinterpret_cast<uintptr_t>(state->stack_bounds.data());
-  const auto execfn = static_cast<uintptr_t>(getauxval(AT_EXECFN));
-  // Retain the initial stack's maps-derived growth allowance.
-  if (begin <= execfn && execfn - begin < state->stack_bounds.size()) {
-    return state;
-  }
-  const auto bounds = retrieve_stack_bounds();
-  if (!bounds.empty()) {
-    state->stack_bounds = bounds;
-    state->stack_bounds_source = StackBoundsSource::kPthread;
-  }
-  return state;
 }
 
 TrackerThreadLocalState *
@@ -594,7 +565,7 @@ AllocationTracker::next_sample_interval(std::minstd_rand &gen) const {
 }
 
 void AllocationTracker::notify_thread_start() {
-  if (unlikely(!get_or_init_tl_state_outside_alloc_hook())) {
+  if (unlikely(!get_or_init_tl_state())) {
     LG_DBG("Unable to start allocation profiling on thread %d",
            ddprof::gettid());
   }
