@@ -141,14 +141,12 @@ TEST(retrieve_stack_bounds_from_maps, main_thread) {
   if (stack_limit.rlim_cur != RLIM_INFINITY) {
     EXPECT_GE(bounds.size(), stack_limit.rlim_cur);
   }
-#ifdef __GLIBC__
-  // Same lower bound as glibc: rlimit size, capped by the mapping below. glibc
-  // places the upper bound at the page of __libc_stack_end, within the mapping.
+  // Same lower bound as glibc, also on musl whose pthread_getattr_np stops at
+  // the mapped part of the stack.
   auto pthread_bounds = retrieve_stack_bounds();
   EXPECT_EQ(bounds.data(), pthread_bounds.data());
   EXPECT_GE(bounds.data() + bounds.size(),
             pthread_bounds.data() + pthread_bounds.size());
-#endif
 }
 
 namespace {

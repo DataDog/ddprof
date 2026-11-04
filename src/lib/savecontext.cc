@@ -9,6 +9,7 @@
 #include "defer.hpp"
 #include "pthread_fixes.hpp"
 #include "saveregisters.hpp"
+#include "syscalls.hpp"
 
 #include <algorithm>
 #include <cerrno>
@@ -21,24 +22,6 @@
 #include <unistd.h>
 
 namespace ddprof {
-
-// Returns an empty span in case of failure
-// Fills start (low address, so closer to SP) and end (stack end address is the
-// start of the stack since stack grows down)
-DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
-  void *stack_addr;
-  size_t stack_size;
-  pthread_attr_t attrs;
-  if (pthread_getattr_np_safe(pthread_self(), &attrs) != 0) {
-    return {};
-  }
-  defer { pthread_attr_destroy(&attrs); };
-  if (pthread_attr_getstack(&attrs, &stack_addr, &stack_size) != 0) {
-    return {};
-  }
-  return {static_cast<std::byte *>(stack_addr),
-          static_cast<std::byte *>(stack_addr) + stack_size};
-}
 
 namespace {
 struct Mapping {
@@ -101,27 +84,26 @@ Mapping find_mapping(uintptr_t addr) {
   }
   return {};
 }
-} // namespace
 
-DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
-  // Called from allocation hooks: the caller's errno must survive.
-  const int saved_errno = errno;
-  defer { errno = saved_errno; };
+struct StackMapping {
+  std::span<const std::byte> bounds;
+  bool initial_stack;
+};
 
-  const auto frame = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
-  auto range = find_mapping(frame);
+// Mapping holding the current stack frame.
+StackMapping current_stack_mapping() {
+  auto range =
+      find_mapping(reinterpret_cast<uintptr_t>(__builtin_frame_address(0)));
   if (range.start == range.end) {
     return {};
   }
-  // The main thread [stack] mapping only covers what has been used so far;
-  // like glibc's pthread_getattr_np, extend it down to the rlimit size, capped
-  // by the mapping below (which also covers an unlimited rlimit), so that
-  // deeper stacks later still pass save_stack's bounds check. Only the lower
-  // bound moves, so no unmapped memory is ever copied.
-  // The kernel puts the AT_EXECFN string at the top of the initial stack, so
-  // this only applies when we are on that stack, not on a fiber/signal stack.
+  // AT_EXECFN sits atop the initial stack, which excludes fiber/signal stacks.
   const auto execfn = static_cast<uintptr_t>(getauxval(AT_EXECFN));
-  if (range.start <= execfn && execfn < range.end) {
+  const bool initial_stack = range.start <= execfn && execfn < range.end;
+  if (initial_stack) {
+    // [stack] grows on demand: extend the lower bound like glibc's
+    // pthread_getattr_np (rlimit, capped by the mapping below) so deeper
+    // frames pass save_stack's check. Safe since save_stack copies from SP up.
     uintptr_t low = range.prev_end;
     rlimit stack_limit;
     if (::getrlimit(RLIMIT_STACK, &stack_limit) == 0 &&
@@ -131,17 +113,55 @@ DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
                      range.end - static_cast<uintptr_t>(stack_limit.rlim_cur));
     }
     range.start = std::min(range.start, low);
-  } else {
-    // Adjacent RW mappings can merge; cap at the thread descriptor when it is
-    // above the frame in this mapping. Separate TLS and alternate stacks may
-    // put the descriptor elsewhere.
-    const auto self = reinterpret_cast<uintptr_t>(pthread_self());
-    if (frame < self && self < range.end) {
-      range.end = self;
+  }
+  return {.bounds = {reinterpret_cast<const std::byte *>(range.start),
+                     reinterpret_cast<const std::byte *>(range.end)},
+          .initial_stack = initial_stack};
+}
+} // namespace
+
+DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds() {
+  void *stack_addr;
+  size_t stack_size;
+  pthread_attr_t attrs;
+  if (pthread_getattr_np_safe(pthread_self(), &attrs) != 0) {
+    return {};
+  }
+  defer { pthread_attr_destroy(&attrs); };
+  if (pthread_attr_getstack(&attrs, &stack_addr, &stack_size) != 0) {
+    return {};
+  }
+  std::span<const std::byte> bounds{static_cast<std::byte *>(stack_addr),
+                                    stack_size};
+  // musl reports only the mapped part of the initial stack.
+  if (ddprof::gettid() == getpid()) {
+    const int saved_errno = errno;
+    defer { errno = saved_errno; };
+    const auto mapping = current_stack_mapping();
+    if (mapping.initial_stack &&
+        reinterpret_cast<uintptr_t>(mapping.bounds.data()) <
+            reinterpret_cast<uintptr_t>(bounds.data())) {
+      bounds = {mapping.bounds.data(), bounds.data() + bounds.size()};
     }
   }
-  return {reinterpret_cast<const std::byte *>(range.start),
-          reinterpret_cast<const std::byte *>(range.end)};
+  return bounds;
+}
+
+DDPROF_NOINLINE std::span<const std::byte> retrieve_stack_bounds_from_maps() {
+  // Called from allocation hooks: the caller's errno must survive.
+  const int saved_errno = errno;
+  defer { errno = saved_errno; };
+
+  auto [bounds, initial_stack] = current_stack_mapping();
+  // Cap at the descriptor only when it is above the frame in this mapping.
+  // Separate TLS and alternate stacks can put it elsewhere.
+  const auto frame = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+  const auto self = reinterpret_cast<uintptr_t>(pthread_self());
+  const auto end = reinterpret_cast<uintptr_t>(bounds.data()) + bounds.size();
+  if (!initial_stack && frame < self && self < end) {
+    bounds = {bounds.data(), reinterpret_cast<const std::byte *>(self)};
+  }
+  return bounds;
 }
 
 namespace {

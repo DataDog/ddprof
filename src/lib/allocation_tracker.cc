@@ -105,9 +105,9 @@ AllocationTracker::init_tl_state_internal(bool from_alloc_hook) {
   // profiled at all, and #531 gave them exact pthread_getattr_np bounds at the
   // cost of this deadlock. Known limits of the maps-based bounds: they describe
   // the stack in use at the first allocation (wrong if that is a fiber or
-  // signal stack), the upper bound can include the TCB/static TLS or the rest
-  // of a user-supplied stack mapping, and they are empty if /proc is not
-  // available.
+  // signal stack), the upper bound can include static TLS, or the rest of a
+  // user-supplied stack mapping not holding the thread descriptor, and they are
+  // empty if /proc is not available.
   state->stack_bounds = from_alloc_hook ? retrieve_stack_bounds_from_maps()
                                         : retrieve_stack_bounds();
   if (!state->stack_bounds.empty()) {
