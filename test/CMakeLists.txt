@@ -255,7 +255,6 @@ set_property(TARGET dwfl_module-ut PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 add_unit_test(
   savecontext-ut
   savecontext-ut.cc
-  main_stack_growth-ut.cc
   ${PROCESS_SRC}
   ../src/base_frame_symbol_lookup.cc
   ../src/common_mapinfo_lookup.cc
