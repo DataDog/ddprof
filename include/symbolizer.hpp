@@ -118,6 +118,15 @@ private:
           symbolizer(blaze_symbolizer_new_opts(&opts)),
           elf_src(std::move(elf_src)), use_debug(inlined_fns) {}
 
+    // Two-level cache:
+    // - Function IDs: non-inlined functions keyed by
+    //   (function start, filename), inlined functions by
+    //   (ELF address, inline index).
+    // - Exact ELF addresses: non-inlined function ID and per-frame lines;
+    //   inlined function IDs come from the inlined-function cache.
+    //
+    // Exact-address hits skip blaze and interning. New addresses require
+    // blaze but reuse non-inlined function IDs for matching start/filename.
     struct AddressCacheEntry {
       ddog_prof_FunctionId2 outer_function{};
       std::vector<uint32_t> lines; // inlined frames first, outer frame last
