@@ -565,8 +565,19 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
     NAME pthread_deadlock
     COMMAND pthread_deadlock
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-  set_tests_properties(pthread_deadlock PROPERTIES TIMEOUT 5)
 
+  ddprof_add_library(pthread_deadlock_dlopen_lib SHARED pthread_deadlock_dlopen_lib.cc)
+  target_link_libraries(pthread_deadlock_dlopen_lib PRIVATE Threads::Threads)
+  add_exe(pthread_deadlock_dlopen pthread_deadlock_dlopen.cc LIBRARIES dd_profiling-shared
+                                                                       Threads::Threads dl)
+  target_include_directories(pthread_deadlock_dlopen PRIVATE ${CMAKE_SOURCE_DIR}/include)
+  add_dependencies(pthread_deadlock_dlopen pthread_deadlock_dlopen_lib)
+  add_test(
+    NAME pthread_deadlock_dlopen
+    COMMAND pthread_deadlock_dlopen $<TARGET_FILE:pthread_deadlock_dlopen_lib>
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+  set(pthread_deadlock_tests pthread_deadlock pthread_deadlock_dlopen)
   if(TARGET jemalloc::jemalloc_static)
     add_exe(pthread_deadlock_mmap pthread_deadlock_mmap.cc
             LIBRARIES dd_profiling-shared jemalloc::jemalloc_static Threads::Threads dl)
@@ -575,8 +586,12 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "SanitizedDebug")
       NAME pthread_deadlock_mmap
       COMMAND pthread_deadlock_mmap
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-    set_tests_properties(pthread_deadlock_mmap PROPERTIES TIMEOUT 5)
+    list(APPEND pthread_deadlock_tests pthread_deadlock_mmap)
   endif()
+  set_tests_properties(
+    ${pthread_deadlock_tests}
+    PROPERTIES TIMEOUT 30 ENVIRONMENT
+               "DD_PROFILING_DO_EXPORT=0;DD_PROFILING_NATIVE_LOG_LEVEL=debug")
 endif()
 
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")

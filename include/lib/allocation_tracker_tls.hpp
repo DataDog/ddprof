@@ -7,6 +7,12 @@
 
 namespace ddprof {
 
+enum class StackBoundsSource : uint8_t {
+  kUnset = 0,
+  kPthread,
+  kProcMaps,
+};
+
 struct TrackerThreadLocalState {
   int64_t remaining_bytes{0}; // remaining allocation bytes until next sample
   std::span<const std::byte> stack_bounds;
@@ -19,21 +25,16 @@ struct TrackerThreadLocalState {
   bool reentry_guard{false}; // prevent reentry in AllocationTracker (eg. when
                              // allocation are done inside AllocationTracker)
                              // and double counting of allocations (eg. when new
-                             // calls malloc, or malloc calls mmap internally).
-                             // Also used on uninitialized TLS (before placement
-                             // new) to indicate we are inside a hooked
-                             // pthread_getattr_np call, preventing get_tl_state
-                             // from calling init_tl_state which would deadlock
-                             // (init_tl_state -> save_context ->
-                             // pthread_getattr_np). Safe because placement new
-                             // in init_tl_state resets this field to false.
+                             // calls malloc, or malloc calls mmap internally)
 
   bool allocation_allowed{true}; // Indicate if allocation is allowed or not
                                  // (eg. when we are in mmap hook, we
                                  // should not allocate because we might already
                                  // be inside an allocation)
 
-  // Set to true by placement new in init_tl_state().
+  StackBoundsSource stack_bounds_source{StackBoundsSource::kUnset};
+
+  // Set to true when constructing the state.
   // Zero-initialized (false) in a fresh thread's TLS before init.
   bool initialized{true};
 };

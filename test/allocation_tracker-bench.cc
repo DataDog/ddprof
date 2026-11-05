@@ -123,7 +123,7 @@ void perform_memory_operations(bool track_allocations,
       threads.emplace_back([&, i] {
         // in theory we automatically hook in thread creation
         // though in the benchmark we can not do this.
-        ddprof::AllocationTracker::init_tl_state();
+        ddprof::AllocationTracker::get_or_init_tl_state();
         std::uniform_int_distribution<uintptr_t> dis(i * page_size,
                                                      (i + 1) * page_size - 1);
 
@@ -142,7 +142,7 @@ void perform_memory_operations(bool track_allocations,
     threads.clear();
     for (int i = 0; i < nb_threads; ++i) {
       threads.emplace_back([&, i] {
-        ddprof::AllocationTracker::init_tl_state();
+        ddprof::AllocationTracker::get_or_init_tl_state();
         for (auto addr : thread_addresses[i]) {
           my_free(addr);
         }
@@ -186,7 +186,7 @@ public:
 
   WorkerThread() : stop(false), perform_task(false) {
     worker_thread = std::thread([this] {
-      ddprof::AllocationTracker::init_tl_state();
+      ddprof::AllocationTracker::get_or_init_tl_state();
       while (!stop) {
         std::unique_lock<std::mutex> lock(mutex);
         cv.wait(lock, [this] { return perform_task || stop; });

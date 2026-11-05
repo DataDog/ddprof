@@ -19,6 +19,7 @@
 #include "pevent_lib.hpp"
 #include "reentry_guard.hpp"
 #include "ringbuffer_holder.hpp"
+#include "savecontext.hpp"
 #include "symbol_helper.hpp"
 #include "symbol_overrides.hpp"
 #include "syscalls.hpp"
@@ -26,8 +27,11 @@
 #include "unwind.hpp"
 #include "unwind_state.hpp"
 
+#include <array>
 #include <cstdlib>
 #include <gtest/gtest.h>
+#include <latch>
+#include <new>
 #ifdef USE_JEMALLOC
 #  include <jemalloc/jemalloc.h>
 #else
@@ -42,6 +46,7 @@ DDPROF_WEAK void sdallocx(void *ptr, size_t size, int flags);
 #endif
 #include <malloc.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #if defined(__GNUC__) && !defined(__clang__)
@@ -170,6 +175,146 @@ TEST(allocation_tracker, start_stop) {
   }
   AllocationTracker::allocation_tracking_free();
   ASSERT_FALSE(AllocationTracker::is_active());
+}
+
+TEST(allocation_tracker, stack_bounds_source_default) {
+  const TrackerThreadLocalState default_state;
+  EXPECT_EQ(default_state.stack_bounds_source, StackBoundsSource::kUnset);
+  EXPECT_TRUE(default_state.stack_bounds.empty());
+
+  alignas(TrackerThreadLocalState)
+      std::array<std::byte, sizeof(TrackerThreadLocalState)>
+          storage;
+  storage.fill(std::byte{0xff});
+  auto *state = new (storage.data()) TrackerThreadLocalState{};
+  EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kUnset);
+  EXPECT_TRUE(state->stack_bounds.empty());
+  EXPECT_TRUE(state->initialized);
+  state->~TrackerThreadLocalState();
+}
+
+TEST(allocation_tracker, thread_start) {
+  const RingBufferHolder ring_buffer{kBufSizeOrder,
+                                     RingBufferType::kMPSCRingBuffer};
+  AllocationTracker::allocation_tracking_init(
+      kSamplingRate, AllocationTracker::kDeterministicSampling,
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
+  defer { AllocationTracker::allocation_tracking_free(); };
+
+  std::thread t([] {
+    EXPECT_EQ(AllocationTracker::get_tl_state(), nullptr);
+    AllocationTracker::notify_thread_start();
+    auto *state = AllocationTracker::get_tl_state();
+    ASSERT_NE(state, nullptr);
+    const auto bounds = retrieve_stack_bounds();
+    ASSERT_FALSE(bounds.empty());
+    EXPECT_EQ(state->stack_bounds.data(), bounds.data());
+    EXPECT_EQ(state->stack_bounds.size(), bounds.size());
+    EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kPthread);
+    EXPECT_EQ(state->tid, ddprof::gettid());
+
+    constexpr int64_t kRemainingBytes = -12345;
+    state->remaining_bytes = kRemainingBytes;
+    AllocationTracker::notify_thread_start();
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), state);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
+              state);
+    EXPECT_EQ(state->remaining_bytes, kRemainingBytes);
+  });
+  t.join();
+}
+
+TEST(allocation_tracker, retains_cached_maps_bounds) {
+  const RingBufferHolder ring_buffer{kBufSizeOrder,
+                                     RingBufferType::kMPSCRingBuffer};
+  AllocationTracker::allocation_tracking_init(
+      kSamplingRate, AllocationTracker::kDeterministicSampling,
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
+  defer { AllocationTracker::allocation_tracking_free(); };
+
+  std::thread t([] {
+    auto *state = AllocationTracker::get_or_init_tl_state(
+        /*from_alloc_hook=*/true);
+    ASSERT_NE(state, nullptr);
+    ASSERT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
+    const auto bounds = state->stack_bounds;
+    const auto generator = state->gen;
+    constexpr int64_t kRemainingBytes = -12345;
+    state->remaining_bytes = kRemainingBytes;
+
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), state);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
+              state);
+    AllocationTracker::notify_thread_start();
+    EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kProcMaps);
+    EXPECT_EQ(state->stack_bounds.data(), bounds.data());
+    EXPECT_EQ(state->stack_bounds.size(), bounds.size());
+    EXPECT_EQ(state->gen, generator);
+    EXPECT_EQ(state->remaining_bytes, kRemainingBytes);
+  });
+  t.join();
+}
+
+#ifdef __GLIBC__
+TEST(allocation_tracker, unset_bounds_after_failed_initial_discovery) {
+  const RingBufferHolder ring_buffer{kBufSizeOrder,
+                                     RingBufferType::kMPSCRingBuffer};
+  rlimit limit;
+  ASSERT_EQ(getrlimit(RLIMIT_NOFILE, &limit), 0);
+  auto exhausted_limit = limit;
+  exhausted_limit.rlim_cur = 0;
+  {
+    ASSERT_EQ(setrlimit(RLIMIT_NOFILE, &exhausted_limit), 0);
+    defer { setrlimit(RLIMIT_NOFILE, &limit); };
+    AllocationTracker::allocation_tracking_init(
+        kSamplingRate, AllocationTracker::kDeterministicSampling,
+        k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
+  }
+  defer { AllocationTracker::allocation_tracking_free(); };
+
+  auto *state = AllocationTracker::get_tl_state();
+  ASSERT_NE(state, nullptr);
+  EXPECT_TRUE(state->initialized);
+  EXPECT_TRUE(state->stack_bounds.empty());
+  EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kUnset);
+  EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), state);
+  EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
+            state);
+  AllocationTracker::notify_thread_start();
+  EXPECT_TRUE(state->stack_bounds.empty());
+  EXPECT_EQ(state->stack_bounds_source, StackBoundsSource::kUnset);
+
+  std::thread t([&] {
+    ASSERT_EQ(AllocationTracker::get_tl_state(), nullptr);
+    TrackerThreadLocalState *worker_state;
+    {
+      ASSERT_EQ(setrlimit(RLIMIT_NOFILE, &exhausted_limit), 0);
+      defer { setrlimit(RLIMIT_NOFILE, &limit); };
+      worker_state = AllocationTracker::get_or_init_tl_state(
+          /*from_alloc_hook=*/true);
+    }
+    ASSERT_NE(worker_state, nullptr);
+    EXPECT_TRUE(worker_state->initialized);
+    EXPECT_TRUE(worker_state->stack_bounds.empty());
+    EXPECT_EQ(worker_state->stack_bounds_source, StackBoundsSource::kUnset);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), worker_state);
+    EXPECT_TRUE(worker_state->stack_bounds.empty());
+    EXPECT_EQ(worker_state->stack_bounds_source, StackBoundsSource::kUnset);
+  });
+  t.join();
+}
+
+#endif
+
+TEST(allocation_tracker, lookup_without_tracking) {
+  ASSERT_FALSE(AllocationTracker::is_active());
+  std::thread t([] {
+    EXPECT_EQ(AllocationTracker::get_tl_state(), nullptr);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(), nullptr);
+    EXPECT_EQ(AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true),
+              nullptr);
+  });
+  t.join();
 }
 
 TEST(allocation_tracker, stale_lock) {
@@ -646,6 +791,49 @@ DDPROF_NOINLINE void test_allocation_functions(RingBuffer &ring_buffer) {
   }
 }
 
+DDPROF_NOINLINE void *map_for_thread_state_test(size_t size) {
+  return mmap(nullptr, size, PROT_READ | PROT_WRITE,
+              MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+}
+
+TEST(allocation_tracker, mmap_initializes_thread_state) {
+  TscClock::init();
+  PerfClock::init();
+  RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
+  AllocationTracker::allocation_tracking_init(
+      kSamplingRate, AllocationTracker::kDeterministicSampling,
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
+  defer { AllocationTracker::allocation_tracking_free(); };
+  ASSERT_TRUE(AllocationTracker::is_active());
+
+  constexpr size_t kMappingSize = 4096;
+  std::latch ready{1};
+  std::latch proceed{1};
+  bool initialized_before = true;
+  bool initialized_after = false;
+  void *mapping = MAP_FAILED;
+  std::thread worker([&] {
+    ready.count_down();
+    proceed.wait();
+    initialized_before = AllocationTracker::get_tl_state() != nullptr;
+    mapping = map_for_thread_state_test(kMappingSize);
+    initialized_after = AllocationTracker::get_tl_state() != nullptr;
+    if (mapping != MAP_FAILED) {
+      munmap(mapping, kMappingSize);
+    }
+  });
+
+  ready.wait();
+  setup_overrides();
+  proceed.count_down();
+  worker.join();
+  restore_overrides();
+
+  EXPECT_FALSE(initialized_before);
+  EXPECT_NE(mapping, MAP_FAILED);
+  EXPECT_TRUE(initialized_after);
+}
+
 TEST(allocation_tracker, test_allocation_functions) {
   RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
   AllocationTracker::allocation_tracking_init(
@@ -666,6 +854,104 @@ TEST(allocation_tracker, test_allocation_functions) {
   // these addresses before `setup_overrides`.
   test_allocation_functions(ring_buffer.get_ring_buffer());
   restore_overrides();
+}
+
+namespace {
+struct TlStateResult {
+  bool initialized_before{true};
+  std::span<const std::byte> stack_bounds;
+  uintptr_t frame{};
+  uintptr_t thread_descriptor{};
+};
+
+// Starts a thread whose stack is a sub-range of a larger anonymous mapping:
+// pthread_getattr_np reports the sub-range, while the /proc/self/maps mapping
+// containing the stack is the whole mapping. This tells which source was used.
+template <void (*InitFn)(TlStateResult &)>
+void run_on_custom_stack(std::span<std::byte> stack, TlStateResult &result) {
+  pthread_attr_t attr;
+  ASSERT_EQ(pthread_attr_init(&attr), 0);
+  defer { pthread_attr_destroy(&attr); };
+  ASSERT_EQ(pthread_attr_setstack(&attr, stack.data(), stack.size()), 0);
+  pthread_t thread;
+  ASSERT_EQ(pthread_create(
+                &thread, &attr,
+                [](void *arg) -> void * {
+                  auto &res = *static_cast<TlStateResult *>(arg);
+                  res.initialized_before =
+                      AllocationTracker::get_tl_state() != nullptr;
+                  res.frame =
+                      reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+                  res.thread_descriptor =
+                      reinterpret_cast<uintptr_t>(pthread_self());
+                  InitFn(res);
+                  return nullptr;
+                },
+                &result),
+            0);
+  pthread_join(thread, nullptr);
+}
+} // namespace
+
+TEST(allocation_tracker, tl_state_stack_bounds_source) {
+  RingBufferHolder ring_buffer{kBufSizeOrder, RingBufferType::kMPSCRingBuffer};
+  AllocationTracker::allocation_tracking_init(
+      kSamplingRate, AllocationTracker::kDeterministicSampling,
+      k_default_perf_stack_sample_size, ring_buffer.get_buffer_info(), {});
+  defer { AllocationTracker::allocation_tracking_free(); };
+
+  constexpr size_t kMappingSize = 4 * 1024 * 1024;
+  constexpr size_t kStackOffset = 1024 * 1024;
+  constexpr size_t kStackSize = 1024 * 1024;
+  void *mapping = mmap(nullptr, kMappingSize, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(mapping, MAP_FAILED);
+  defer { munmap(mapping, kMappingSize); };
+  std::span<std::byte> const mapping_span{static_cast<std::byte *>(mapping),
+                                          kMappingSize};
+  auto const stack = mapping_span.subspan(kStackOffset, kStackSize);
+
+  // Thread start (not inside an allocation hook) uses pthread_getattr_np.
+  TlStateResult thread_start;
+  run_on_custom_stack<[](TlStateResult &res) {
+    AllocationTracker::notify_thread_start();
+    res.stack_bounds = AllocationTracker::get_tl_state()->stack_bounds;
+  }>(stack, thread_start);
+  EXPECT_FALSE(thread_start.initialized_before);
+  EXPECT_GE(thread_start.stack_bounds.data(), stack.data());
+  EXPECT_LE(thread_start.stack_bounds.data() + thread_start.stack_bounds.size(),
+            stack.data() + stack.size());
+
+  // Callers outside hooks (eg. MaybeReentryGuard) also use pthread_getattr_np.
+  TlStateResult get_or_init;
+  run_on_custom_stack<[](TlStateResult &res) {
+    res.stack_bounds = AllocationTracker::get_or_init_tl_state()->stack_bounds;
+  }>(stack, get_or_init);
+  EXPECT_FALSE(get_or_init.initialized_before);
+  EXPECT_GE(get_or_init.stack_bounds.data(), stack.data());
+  EXPECT_LE(get_or_init.stack_bounds.data() + get_or_init.stack_bounds.size(),
+            stack.data() + stack.size());
+
+  // Initialization from an allocation hook uses /proc/self/maps.
+  TlStateResult alloc_hook;
+  run_on_custom_stack<[](TlStateResult &res) {
+    res.stack_bounds =
+        AllocationTracker::get_or_init_tl_state(/*from_alloc_hook=*/true)
+            ->stack_bounds;
+  }>(stack, alloc_hook);
+  EXPECT_FALSE(alloc_hook.initialized_before);
+  EXPECT_LE(alloc_hook.stack_bounds.data(), mapping_span.data());
+  const auto mapping_end =
+      reinterpret_cast<uintptr_t>(mapping_span.data() + mapping_span.size());
+  const auto bounds_end = reinterpret_cast<uintptr_t>(
+      alloc_hook.stack_bounds.data() + alloc_hook.stack_bounds.size());
+  EXPECT_GT(bounds_end, alloc_hook.frame);
+  if (alloc_hook.frame < alloc_hook.thread_descriptor &&
+      alloc_hook.thread_descriptor < mapping_end) {
+    EXPECT_EQ(bounds_end, alloc_hook.thread_descriptor);
+  } else {
+    EXPECT_GE(bounds_end, mapping_end);
+  }
 }
 
 } // namespace ddprof

@@ -18,6 +18,11 @@ namespace ddprof {
    Return an empty span in case of failure.*/
 DDPROF_NOIPO std::span<const std::byte> retrieve_stack_bounds();
 
+/**Read the current stack mapping from /proc/self/maps without allocating,
+   taking pthread locks, or introducing cancellation points.
+   Preserve errno and return an empty span on failure.*/
+DDPROF_NOIPO std::span<const std::byte> retrieve_stack_bounds_from_maps();
+
 /** Save registers and stack for remote unwinding
  * Return saved stack size */
 DDPROF_NOIPO size_t
