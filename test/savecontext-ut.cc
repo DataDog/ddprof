@@ -9,18 +9,24 @@
 #include "defer.hpp"
 #include "loghandle.hpp"
 #include "perf.hpp"
+#include "pthread_fixes.hpp"
 #include "savecontext.hpp"
 #include "symbol_helper.hpp"
 #include "unwind.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cerrno>
 #include <condition_variable>
 #include <csignal>
+#include <cstdlib>
 #include <mutex>
+#include <pthread.h>
 #include <sys/mman.h>
 #include <sys/resource.h>
+#include <sys/syscall.h>
+#include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
 
@@ -141,14 +147,12 @@ TEST(retrieve_stack_bounds_from_maps, main_thread) {
   if (stack_limit.rlim_cur != RLIM_INFINITY) {
     EXPECT_GE(bounds.size(), stack_limit.rlim_cur);
   }
-#ifdef __GLIBC__
-  // Same lower bound as glibc: rlimit size, capped by the mapping below. glibc
-  // places the upper bound at the page of __libc_stack_end, within the mapping.
+  // Same lower bound as glibc, also on musl whose pthread_getattr_np stops at
+  // the mapped part of the stack.
   auto pthread_bounds = retrieve_stack_bounds();
   EXPECT_EQ(bounds.data(), pthread_bounds.data());
   EXPECT_GE(bounds.data() + bounds.size(),
             pthread_bounds.data() + pthread_bounds.size());
-#endif
 }
 
 namespace {
@@ -259,6 +263,131 @@ TEST(retrieve_stack_bounds_from_maps, secondary_thread) {
     EXPECT_GT(save_context(maps_bounds, saved_regs, buffer), 0);
   });
   t.join();
+}
+
+namespace {
+std::span<const std::byte> raw_pthread_bounds() {
+  pthread_attr_t attrs;
+  if (pthread_getattr_np_safe(pthread_self(), &attrs) != 0) {
+    return {};
+  }
+  defer { pthread_attr_destroy(&attrs); };
+  void *address;
+  size_t size;
+  if (pthread_attr_getstack(&attrs, &address, &size) != 0) {
+    return {};
+  }
+  return {static_cast<const std::byte *>(address), size};
+}
+
+constexpr uintptr_t kGrowthBytes = 64 * 1024;
+std::array<std::byte, 8192> captured_stack;
+
+DDPROF_NOINLINE int capture_after_growth(std::span<const std::byte> bounds,
+                                         uintptr_t target, uintptr_t old_low) {
+  const auto frame = reinterpret_cast<uintptr_t>(__builtin_frame_address(0));
+  if (frame >= target) {
+    volatile char padding[4096];
+    padding[0] = 1;
+    padding[sizeof(padding) - 1] = 2;
+    const int result = capture_after_growth(bounds, target, old_low);
+    if (padding[0] != 1 || padding[sizeof(padding) - 1] != 2) {
+      return 3;
+    }
+    DDPROF_BLOCK_TAIL_CALL_OPTIMIZATION();
+    return result;
+  }
+  std::array<uint64_t, k_perf_register_count> regs{};
+  const auto size = save_context(bounds, regs, captured_stack);
+  if (regs[REGNAME(SP)] >= old_low) {
+    return 1;
+  }
+  return size > 0 ? 0 : 2;
+}
+} // namespace
+
+TEST(retrieve_stack_bounds, main_stack_growth) {
+  const auto raw_bounds = raw_pthread_bounds();
+  const auto maps_bounds = retrieve_stack_bounds_from_maps();
+  const auto bounds = retrieve_stack_bounds();
+  ASSERT_FALSE(raw_bounds.empty());
+  ASSERT_FALSE(maps_bounds.empty());
+  ASSERT_FALSE(bounds.empty());
+  EXPECT_EQ(bounds.data() + bounds.size(),
+            raw_bounds.data() + raw_bounds.size());
+  const auto raw_low = reinterpret_cast<uintptr_t>(raw_bounds.data());
+  const auto maps_low = reinterpret_cast<uintptr_t>(maps_bounds.data());
+  if (raw_low <= maps_low) {
+    EXPECT_EQ(bounds.data(), raw_bounds.data());
+    GTEST_SKIP() << "pthread bounds already account for main-stack growth";
+  }
+  if (raw_low - maps_low <= 2 * kGrowthBytes) {
+    GTEST_SKIP() << "insufficient main-stack growth allowance";
+  }
+  ASSERT_EXIT(
+      {
+        const auto cached_bounds = retrieve_stack_bounds();
+        const auto initial_bounds = raw_pthread_bounds();
+        const auto initial_low =
+            reinterpret_cast<uintptr_t>(initial_bounds.data());
+        std::_Exit(capture_after_growth(
+            cached_bounds, initial_low - kGrowthBytes, initial_low));
+      },
+      ::testing::ExitedWithCode(0), "");
+}
+
+TEST(retrieve_stack_bounds, preserves_forked_worker_stack) {
+  // Make the VMA wider than the configured pthread stack.
+  constexpr size_t kStackSize = 1024 * 1024;
+  void *mapping = mmap(nullptr, 3 * kStackSize, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  ASSERT_NE(mapping, MAP_FAILED);
+  defer { munmap(mapping, 3 * kStackSize); };
+  pthread_attr_t attrs;
+  ASSERT_EQ(pthread_attr_init(&attrs), 0);
+  defer { pthread_attr_destroy(&attrs); };
+  auto *stack_address = static_cast<std::byte *>(mapping) + kStackSize;
+  ASSERT_EQ(pthread_attr_setstack(&attrs, stack_address, kStackSize), 0);
+
+  int status = -1;
+  pthread_t worker;
+  ASSERT_EQ(pthread_create(
+                &worker, &attrs,
+                [](void *arg) -> void * {
+                  auto *child_status = static_cast<int *>(arg);
+                  const auto child = fork();
+                  if (child == 0) {
+                    const auto expected = raw_pthread_bounds();
+                    const auto maps = retrieve_stack_bounds_from_maps();
+                    const auto actual = retrieve_stack_bounds();
+                    const bool leader = ::syscall(SYS_gettid) == getpid();
+                    if (!leader || expected.empty() || maps.empty() ||
+                        reinterpret_cast<uintptr_t>(maps.data()) >=
+                            reinterpret_cast<uintptr_t>(expected.data())) {
+                      std::_Exit(2);
+                    }
+                    std::_Exit(actual.data() == expected.data() &&
+                                       actual.size() == expected.size()
+                                   ? 0
+                                   : 1);
+                  }
+                  if (child > 0) {
+                    pid_t waited;
+                    do {
+                      waited = waitpid(child, child_status, 0);
+                    } while (waited < 0 && errno == EINTR);
+                    if (waited != child) {
+                      *child_status = -1;
+                    }
+                  }
+                  return nullptr;
+                },
+                &status),
+            0);
+  ASSERT_EQ(pthread_join(worker, nullptr), 0);
+  ASSERT_GE(status, 0);
+  ASSERT_TRUE(WIFEXITED(status));
+  EXPECT_EQ(WEXITSTATUS(status), 0);
 }
 
 } // namespace ddprof
