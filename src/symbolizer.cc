@@ -151,7 +151,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         }
         const ElfAddress_t addr = elf_addrs[i];
 
-        // Level-2 hit: exact address seen before — write from caches, no blaze.
+        // Exact-address hits reuse interned frames and line numbers.
         auto addr_it = symbolizer_wrapper.address_cache.find(addr);
         if (addr_it != symbolizer_wrapper.address_cache.end()) {
           ++_blaze_stats.addr_hits;
@@ -165,28 +165,17 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
             loc.mapping = mapping_id;
             loc.function = (j < n - 1)
                 ? symbolizer_wrapper.inlined_id_cache.at({addr, j})
-                : symbolizer_wrapper.function_id_cache.at(entry.func_start);
+                : entry.outer_function;
             loc.address = addr;
             loc.line = entry.lines[j];
           }
           continue;
         }
 
-        // Cache miss for this address: run blaze, intern inlined frames, then
-        // check function_id_cache[func_start] for the outer frame — saving
-        // intern_function when the same function is reached from a new call
-        // site.
         ++_blaze_stats.addr_misses;
 
-        // Build the address_cache entry locally and commit it only after all
-        // frames are written successfully. An early return
-        // (DD_WHAT_UW_MAX_DEPTH) before the outer frame would leave a partial
-        // entry whose func_start has no matching function_id_cache value,
-        // causing .at() to throw on the next sample. function_id_cache /
-        // inlined_id_cache can be partially populated without harm — those
-        // handles are valid; only address_cache must be all-or-nothing.
+        // Publish the address entry only after all frames are written.
         BlazeSymbolizerWrapper::AddressCacheEntry candidate;
-        candidate.func_start = cur_sym->addr;
 
         constexpr std::string_view undef{};
         const auto sopath = mapping_id ? get_string(dict, mapping_id->filename)
@@ -227,7 +216,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
           candidate.lines.push_back(inlined->code_info.line);
         }
 
-        // Outer frame — shared across all call sites of the same function
+        // A function can span multiple source files.
         if (write_index >= locations.size()) {
           return ddres_warn(DD_WHAT_UW_MAX_DEPTH);
         }
@@ -238,7 +227,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
             ? std::string_view{cur_sym->code_info.file}
             : sopath;
         auto outer_it =
-            symbolizer_wrapper.function_id_cache.find(cur_sym->addr);
+            symbolizer_wrapper.function_id_cache.find({cur_sym->addr, fname});
         if (outer_it == symbolizer_wrapper.function_id_cache.end()) {
           ++_blaze_stats.intern_fn_calls;
           ddog_prof_FunctionId2 fn = intern_function(dict, dname, fname);
@@ -246,7 +235,11 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
             DDRES_RETURN_ERROR_LOG(DD_WHAT_BADALLOC, "OOM interning function");
           }
           outer_it =
-              symbolizer_wrapper.function_id_cache.emplace(cur_sym->addr, fn)
+              symbolizer_wrapper.function_id_cache
+                  .emplace(
+                      BlazeSymbolizerWrapper::FunctionKey{
+                          cur_sym->addr, get_string(dict, fn->file_name)},
+                      fn)
                   .first;
         }
         auto &loc = locations[write_index++];
@@ -255,7 +248,7 @@ DDRes Symbolizer::symbolize_pprof(std::span<ElfAddress_t> elf_addrs,
         loc.address = addr;
         loc.line = cur_sym->code_info.line;
         candidate.lines.push_back(cur_sym->code_info.line);
-        // All frames written — safe to commit the address cache entry.
+        candidate.outer_function = outer_it->second;
         symbolizer_wrapper.address_cache[addr] = std::move(candidate);
       }
       return {};
