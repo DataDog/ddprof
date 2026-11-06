@@ -11,6 +11,8 @@
 #include "unwind_output_hash.hpp"
 
 #include <cstddef>
+#include <deque>
+#include <string>
 #include <sys/types.h>
 #include <unordered_map>
 
@@ -54,6 +56,23 @@ public:
   using WatcherVector = std::vector<PidMap>;
   // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
   WatcherVector _watcher_vector;
+
+  // Owns the string storage backing string_views inside UnwindOutputs that
+  // were restored from a snapshot. Live entries created from incoming
+  // allocation events continue to use views into Process / base-frame
+  // tables; this storage is only used by snapshot-restore.
+  // NOLINTNEXTLINE(misc-non-private-member-variables-in-classes)
+  std::deque<std::string> _restored_strings;
+
+  // Returns a string_view backed by _restored_strings. Empty input maps
+  // to an empty view without allocation.
+  std::string_view intern_restored_string(std::string_view sv) {
+    if (sv.empty()) {
+      return {};
+    }
+    _restored_strings.emplace_back(sv);
+    return _restored_strings.back();
+  }
 
   void register_library_state(int watcher_pos, pid_t pid,
                               uint32_t address_conflict_count,

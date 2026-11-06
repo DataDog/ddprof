@@ -113,6 +113,46 @@ check() {
     check_logs "$@"
 }
 
+# Variant of check() that additionally asserts the LiveAllocation snapshot
+# path survives at least one worker reset:
+#   - at least one '[live-alloc] Snapshot restored' line, and
+#   - zero 'Tracked address count mismatch' warnings between profiler and
+#     library after restore.
+check_live_alloc_persistence() {
+    cmd="$1"
+    min_restored="${5:-1}"
+    if [[ "$use_taskset" -eq 1 ]]; then
+        cmd="taskset ${test_cpu_mask} ${cmd}"
+    fi
+    echo "Running: ${cmd}"
+    # shellcheck disable=SC2086
+    eval ${cmd} || ( echo "Command failed: ${cmd}" && cat "${log_file}" && exit 1 )
+    sync "${log_file}"
+    ddprof_pid=$(grep -m1 -oP -a ' ddprof\[\K[0-9]+(?=\]: Starting profiler)' "${log_file}" || true)
+    if [ -z "${ddprof_pid}" ]; then
+        echo "Unable to find profiler pid"
+        cat "${log_file}"
+        exit 1
+    fi
+    timeout "$timeout_sec" tail --pid="$ddprof_pid" -f /dev/null
+    sync "${log_file}"
+
+    restored=$(grep -c '\[live-alloc\] Snapshot restored' "${log_file}" || true)
+    mismatches=$(grep -c 'Tracked address count mismatch' "${log_file}" || true)
+    if [[ "${restored}" -lt "${min_restored}" ]]; then
+        echo "Expected at least ${min_restored} 'Snapshot restored', got ${restored}"
+        cat "${log_file}"
+        exit 1
+    fi
+    if [[ "${mismatches}" -ne 0 ]]; then
+        echo "Unexpected 'Tracked address count mismatch' lines: ${mismatches}"
+        cat "${log_file}"
+        exit 1
+    fi
+    echo "Live-alloc snapshot persistence OK: restored=${restored}, mismatches=0"
+    check_logs "$@"
+}
+
 # Test disabled static lib mode
 check "./test/simple_malloc-static ${opts}" -1
 
@@ -135,6 +175,16 @@ check "./ddprof --show_config --event \"${event}\" ./test/simple_malloc ${opts} 
 # Test live heap mode, with allocations, CPU events are given through configuration file
 event="sALLOC,period=-524288,mode=sl;sCPU"
 check "./ddprof --show_config --event \"${event}\" ./test/simple_malloc ${opts} --skip-free 100" 1 1 "inuse-space,alloc-space,cpu-time"
+
+# Test that live-heap tracking survives a worker reset.
+# Use a short upload_period and a low worker_period so several resets occur
+# within the run, and a longer simple_malloc loop so the target outlives at
+# least the first reset. --skip-free 100 keeps ~99% of allocations live.
+event="sALLOC,period=-524288,mode=sl;sCPU"
+opts_persist="--malloc 4096 --skip-free 100 --loop 80000 --spin 80 --nice 19"
+check_live_alloc_persistence \
+  "./ddprof --event \"${event}\" --upload-period 2 --worker_period 2 ./test/simple_malloc ${opts_persist}" \
+  1 1 "inuse-space,alloc-space,cpu-time" 1
 
 # Test wrapper mode with forks + threads
 opts_more_spin="--loop 1000 --spin 400"
