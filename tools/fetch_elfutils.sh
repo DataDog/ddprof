@@ -87,7 +87,6 @@ if [[ -n ${MUSL_LIBC-""} ]]; then
   cp /patch/libintl.h ../lib
   patch -p1 < "/patch/fix-aarch64_fregs.patch"
   patch -p1 < "/patch/fix-uninitialized.patch"
-  patch -p1 < "/patch/musl-asm-ptrace-h.patch"
   patch -p1 < "/patch/musl-macros.patch"
   patch -p1 < "/patch/libdw_alloc.c.patch"
 else
