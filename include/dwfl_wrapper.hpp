@@ -37,8 +37,7 @@ struct DwflWrapper {
 
   DDRes attach(pid_t pid, const UniqueElf &ref_elf, UnwindState *us);
 
-  // unsafe get don't check ranges
-  DDProfMod *unsafe_get(FileInfoId_t file_info_id);
+  DDProfMod *get(FileInfoId_t file_info_id, ProcessAddress_t pc);
 
   // safe get
   DDRes register_mod(ProcessAddress_t pc, const Dso &dso,
@@ -55,8 +54,8 @@ struct DwflWrapper {
   bool _attached{false};
   bool _inconsistent{false};
 
-  // Keep track of the files we added to the dwfl object
-  std::unordered_map<FileInfoId_t, DDProfMod> _ddprof_mods;
+  // A file can have multiple load instances at different addresses.
+  std::unordered_multimap<FileInfoId_t, DDProfMod> _ddprof_mods;
 };
 
 } // namespace ddprof
