@@ -42,6 +42,8 @@ public:
   void erase(pid_t pid) { _pid_map.erase(pid); }
 
   void cycle() {
+    // Address reuse must be observed even when every lookup is a cache hit.
+    _pid_map.clear();
     ++_cycle_counter;
     _stats = {};
   }
@@ -168,11 +170,10 @@ private:
 
   static bool should_skip_symbol(std::string_view symbol);
 
-  static bool insert_or_replace(std::string_view symbol,
-                                ProcessAddress_t address, Offset_t code_size,
-                                SymbolMap &symbol_map,
-                                SymbolTable &symbol_table,
-                                const ddog_prof_ProfilesDictionary *dict);
+  bool insert_or_replace(std::string_view symbol, ProcessAddress_t address,
+                         Offset_t code_size, SymbolMap &symbol_map,
+                         SymbolTable &symbol_table,
+                         const ddog_prof_ProfilesDictionary *dict);
 
   static constexpr std::array<const std::string_view, 1>
       _ignored_symbols_start = {{
@@ -181,6 +182,8 @@ private:
       }};
 
   PidUnorderedMap _pid_map;
+  // Reuse immutable table entries across address-cache refreshes.
+  std::unordered_map<ddog_prof_FunctionId2, SymbolIdx_t> _function_symbols;
   std::string _path_to_proc;
   Stats _stats;
   uint32_t _cycle_counter{1};

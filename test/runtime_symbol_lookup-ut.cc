@@ -15,6 +15,7 @@
 #include <datadog/profiling.h>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <string>
 #include <unistd.h>
 
@@ -363,6 +364,135 @@ TEST_F(JitdumpRetry, unreachable_path_does_not_churn) {
                                  symbol_hdr.profiles_dictionary(), bogus);
   }
   EXPECT_EQ(lookup.get_stats()._nb_jit_reads, initial_reads);
+}
+
+namespace {
+class PerfmapRefresh : public ::testing::Test {
+protected:
+  void SetUp() override {
+    char pattern[] = "/tmp/ddprof-perfmap-refresh-XXXXXX";
+    ASSERT_NE(mkdtemp(pattern), nullptr);
+    _root = pattern;
+    const auto directory = _root + "/proc/42/root/tmp";
+    std::filesystem::create_directories(directory);
+    _path = directory + "/perf-42.map";
+  }
+
+  void TearDown() override {
+    std::error_code ec;
+    std::filesystem::remove_all(_root, ec);
+  }
+
+  bool write_map(std::string_view contents) {
+    std::ofstream file(_path);
+    file << contents;
+    return static_cast<bool>(file);
+  }
+
+  SymbolIdx_t find(RuntimeSymbolLookup &lookup, ProcessAddress_t pc) {
+    return lookup.get_or_insert(42, pc, _table, _symbols.profiles_dictionary());
+  }
+
+  std::string name(SymbolIdx_t index) {
+    return dict_string(_symbols.profiles_dictionary(),
+                       _table[index]._function_id->name);
+  }
+
+  std::string _root;
+  std::string _path;
+  SymbolHdr _symbols;
+  SymbolTable _table;
+};
+} // namespace
+
+TEST_F(PerfmapRefresh, cached_address_refreshes_after_cycle) {
+  ASSERT_TRUE(write_map("1000 10 old_function\n"));
+  RuntimeSymbolLookup lookup(_root);
+  const auto old_symbol = find(lookup, 0x1001);
+  ASSERT_NE(old_symbol, -1);
+  ASSERT_EQ(name(old_symbol), "old_function");
+  ASSERT_TRUE(write_map("1000 10 new_function\n"));
+  lookup.cycle();
+  const auto new_symbol = find(lookup, 0x1001);
+  ASSERT_NE(new_symbol, -1);
+  EXPECT_NE(new_symbol, old_symbol);
+  EXPECT_EQ(name(new_symbol), "new_function");
+  EXPECT_EQ(name(old_symbol), "old_function");
+
+  for (int i = 0; i < 4; ++i) {
+    lookup.cycle();
+    EXPECT_EQ(find(lookup, 0x1001), new_symbol);
+  }
+  EXPECT_EQ(_table.size(), 2u);
+}
+
+TEST_F(PerfmapRefresh, replacement_preserves_saved_symbol) {
+  ASSERT_TRUE(write_map("1000 10 old_function\n"));
+  RuntimeSymbolLookup lookup(_root);
+  const auto old_symbol = find(lookup, 0x1001);
+  ASSERT_NE(old_symbol, -1);
+  ASSERT_TRUE(write_map("1000 10 new_function\n2000 10 another_function\n"));
+  ASSERT_NE(find(lookup, 0x2001), -1);
+  const auto new_symbol = find(lookup, 0x1001);
+  ASSERT_NE(new_symbol, -1);
+  EXPECT_NE(new_symbol, old_symbol);
+  EXPECT_EQ(name(new_symbol), "new_function");
+  EXPECT_EQ(name(old_symbol), "old_function");
+}
+
+TEST_F(PerfmapRefresh, removed_address_is_not_retained_after_cycle) {
+  ASSERT_TRUE(write_map("1000 10 old_function\n"));
+  RuntimeSymbolLookup lookup(_root);
+  const auto old_symbol = find(lookup, 0x1001);
+  ASSERT_NE(old_symbol, -1);
+  ASSERT_TRUE(write_map("2000 10 another_function\n"));
+  lookup.cycle();
+  EXPECT_EQ(find(lookup, 0x1001), -1);
+  EXPECT_NE(find(lookup, 0x2001), -1);
+  EXPECT_EQ(name(old_symbol), "old_function");
+}
+
+TEST_F(JitdumpRetry, cached_address_refreshes_after_cycle) {
+  ASSERT_TRUE(copy_file_replace(_full, _tmp_path));
+  SymbolHdr symbols;
+  SymbolTable table;
+  RuntimeSymbolLookup lookup("");
+  const auto *dict = symbols.profiles_dictionary();
+  const auto old_symbol = lookup.get_or_insert_jitdump(getpid(), _matching_pc,
+                                                       table, dict, _tmp_path);
+  ASSERT_NE(old_symbol, -1);
+  ASSERT_EQ(dict_string(dict, table[old_symbol]._function_id->name),
+            "julia_b_11");
+
+  std::string bytes;
+  {
+    std::ifstream file(_tmp_path, std::ios::binary);
+    bytes.assign(std::istreambuf_iterator<char>(file),
+                 std::istreambuf_iterator<char>());
+  }
+  const std::string old_name = "julia_b_11";
+  const auto offset = bytes.find(old_name);
+  ASSERT_NE(offset, std::string::npos);
+  bytes.replace(offset, old_name.size(), "julia_c_12");
+  {
+    std::ofstream file(_tmp_path, std::ios::binary | std::ios::trunc);
+    ASSERT_TRUE(file.write(bytes.data(), bytes.size()));
+  }
+  lookup.cycle();
+  const auto new_symbol = lookup.get_or_insert_jitdump(getpid(), _matching_pc,
+                                                       table, dict, _tmp_path);
+  ASSERT_NE(new_symbol, -1);
+  EXPECT_NE(new_symbol, old_symbol);
+  EXPECT_EQ(dict_string(dict, table[new_symbol]._function_id->name),
+            "julia_c_12");
+  EXPECT_EQ(dict_string(dict, table[old_symbol]._function_id->name),
+            "julia_b_11");
+  const auto table_size = table.size();
+  lookup.cycle();
+  EXPECT_EQ(lookup.get_or_insert_jitdump(getpid(), _matching_pc, table, dict,
+                                         _tmp_path),
+            new_symbol);
+  EXPECT_EQ(table.size(), table_size);
 }
 
 } // namespace ddprof
