@@ -43,9 +43,9 @@ diff -ur elfutils-0.187.orig/src/arlib.h elfutils-0.187/src/arlib.h
 diff -ur elfutils-0.187.orig/src/elfcompress.c elfutils-0.187/src/elfcompress.c
 --- elfutils-0.187.orig/src/elfcompress.c	2022-06-16 18:48:12.919806284 +0200
 +++ elfutils-0.187/src/elfcompress.c	2022-06-16 18:48:18.879811052 +0200
-@@ -37,6 +37,14 @@
- #include "libeu.h"
- #include "printversion.h"
+@@ -41,6 +41,14 @@
+ /* Really should come from libgen.h, but we poisoned basename in system.h.  */
+ extern char *dirname(char *path);
  
 +#if !defined(FNM_EXTMATCH)
 +# define FNM_EXTMATCH 0

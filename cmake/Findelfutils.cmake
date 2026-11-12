@@ -18,10 +18,10 @@ find_package(zstd)
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 
 set(SHA256_ELF
-    "09e2ff033d39baa8b388a2d7fbc5390bfde99ae3b7c67c7daaf7433fbcf0f01e"
+    "1fdf525f22dcf796d99a99ba3ea00a1f7b1ae5421bc62e8443a708920b99b904"
     CACHE STRING "SHA256 of the elfutils tar")
 set(VER_ELF
-    "0.194"
+    "0.197"
     CACHE STRING "elfutils version")
 set(ELFUTILS_PATH ${VENDOR_PATH}/elfutils-${VER_ELF})
 
