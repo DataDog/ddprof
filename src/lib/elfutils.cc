@@ -87,15 +87,23 @@ bool check(const ElfW(Sym) & sym, const char *symname, std::string_view name) {
 }
 
 DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
-                                  // cppcheck-suppress unknownMacro
-                                  ElfW(Addr) base_address) {
+                                  const dl_phdr_info &info) {
+  const auto base_address = info.dlpi_addr;
+  const std::span phdrs{info.dlpi_phdr, info.dlpi_phnum};
 
   // Addresses are sometimes relative sometimes absolute
   // * on musl, addresses are relative
   // * on glibc, addresses are absolutes
   // (https://elixir.bootlin.com/glibc/glibc-2.36/source/elf/get-dynamic-info.h#L84)
-  auto correct_address = [base_address](ElfW(Addr) ptr) {
-    return ptr > base_address ? ptr : base_address + ptr;
+  auto correct_address = [base_address, phdrs](ElfW(Addr) ptr) {
+    // Use the loaded segments to recognize absolute addresses: unrelocated
+    // addresses in older vDSOs can be in the kernel address range.
+    const bool is_absolute = std::any_of(
+        phdrs.begin(), phdrs.end(), [base_address, ptr](const auto &phdr) {
+          return phdr.p_type == PT_LOAD &&
+              ptr - (base_address + phdr.p_vaddr) < phdr.p_memsz;
+        });
+    return is_absolute ? ptr : base_address + ptr;
   };
 
   const char *strtab = nullptr;
@@ -124,12 +132,8 @@ DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
           reinterpret_cast<const ElfW(Sym) *>(correct_address(it->d_un.d_ptr));
       break;
     case DT_HASH:
-      // \fixme{nsavoire} Avoid processing DT_HASH since it sometimes points in
-      // kernel address range on Centos 7...
-
-      // elf_hash =
-      //     reinterpret_cast<const uint32_t
-      //     *>(correct_address(it->d_un.d_ptr));
+      elf_hash =
+          reinterpret_cast<const uint32_t *>(correct_address(it->d_un.d_ptr));
       break;
     case DT_GNU_HASH:
       gnu_hash =
@@ -172,11 +176,9 @@ DynamicInfo retrieve_dynamic_info(const ElfW(Dyn) * dyn_begin,
   uint32_t sym_count = 0;
   if (gnu_hash) {
     sym_count = gnu_hash_symbol_count(gnu_hash);
+  } else if (elf_hash) {
+    sym_count = elf_hash_symbol_count(elf_hash);
   }
-  // Once we fix the issue with DT_HASH, we can use it
-  //  else if (elf_hash) {
-  //    sym_count = elf_hash_symbol_count(elf_hash);
-  //  }
   return {.strtab = {strtab, strtab_size},
           .symtab = {symtab, sym_count},
           .rels = {rels, rels_size / sizeof(ElfW(Rel))},
@@ -214,7 +216,7 @@ std::optional<DynamicInfo> retrieve_dynamic_info(const dl_phdr_info &info,
   const ElfW(Dyn) *dyn_begin = reinterpret_cast<const ElfW(Dyn) *>(
       info.dlpi_addr + phdr_dynamic->p_vaddr);
 
-  DynamicInfo dyn_info = retrieve_dynamic_info(dyn_begin, info.dlpi_addr);
+  DynamicInfo dyn_info = retrieve_dynamic_info(dyn_begin, info);
 
   if (dyn_info.strtab.empty() || dyn_info.symtab.empty() ||
       !(dyn_info.elf_hash || dyn_info.gnu_hash)) {
