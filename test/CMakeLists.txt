@@ -115,6 +115,14 @@ add_unit_test(
 
 add_unit_test(logger-ut logger-ut.cc)
 
+add_library(elfutils-sysv-fixture SHARED elfutils_sysv_fixture.c)
+target_link_options(elfutils-sysv-fixture PRIVATE -Wl,--hash-style=sysv)
+
+add_unit_test(elfutils-ut elfutils-ut.cc ../src/lib/elfutils.cc LIBRARIES dl)
+target_compile_definitions(elfutils-ut
+                           PRIVATE ELFUTILS_SYSV_FIXTURE="$<TARGET_FILE:elfutils-sysv-fixture>")
+add_dependencies(elfutils-ut elfutils-sysv-fixture)
+
 add_unit_test(signal_helper-ut ../src/signal_helper.cc signal_helper-ut.cc)
 
 include(Version)
