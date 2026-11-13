@@ -142,6 +142,9 @@ add_unit_test(ipc-ut ../src/ipc.cc ipc-ut.cc)
 add_unit_test(mmap-ut ../src/perf.cc ../src/perf_watcher.cc mmap-ut.cc DEFINITIONS MYNAME="mmap-ut")
 target_include_directories(mmap-ut PRIVATE)
 
+add_unit_test(perf_mmap-ut ../src/perf.cc ../src/perf_watcher.cc perf_mmap-ut.cc)
+target_link_options(perf_mmap-ut PRIVATE "LINKER:--wrap=mmap")
+
 add_unit_test(ddres-ut ddres-ut.cc DEFINITIONS MYNAME="ddres-ut")
 
 add_unit_test(

@@ -130,37 +130,44 @@ size_t get_mask_from_size(size_t size) {
   return (size - get_page_size() - 1);
 }
 
+namespace {
+void *map_mirrored_buffer(int fd, size_t size) {
+  size_t const total_length = (2 * size) - get_page_size();
+  void *reserved = mmap(nullptr, total_length, PROT_NONE,
+                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+  if (reserved == MAP_FAILED || !reserved) {
+    return nullptr;
+  }
+  auto cleanup_reserved = make_defer([&]() { munmap(reserved, total_length); });
+
+  // Mirror the data pages so reads across the ring's end stay contiguous.
+  auto *ptr = static_cast<std::byte *>(reserved);
+  if (mmap(ptr + size - get_page_size(), size, PROT_READ | PROT_WRITE,
+           MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
+    return nullptr;
+  }
+  if (mmap(ptr, size, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_FIXED, fd, 0) ==
+      MAP_FAILED) {
+    return nullptr;
+  }
+
+  cleanup_reserved.release();
+  return reserved;
+}
+} // namespace
+
 PerfMmapRegion perfown_sz(int fd, size_t size_of_buffer,
                           bool allow_single_mapping) {
   PerfMmapRegion mapping{nullptr, false};
+  // Some kernels reject perf mirroring. Cache a successful fallback to avoid
+  // repeating the failed mapping and cleanup for every CPU.
+  static std::atomic<bool> skip_perf_mirroring{false};
 
-  size_t const total_length = (2 * size_of_buffer) - get_page_size();
-  void *reserved = mmap(nullptr, total_length, PROT_NONE,
-                        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-
-  if (reserved != MAP_FAILED && reserved) {
-    auto cleanup_reserved =
-        make_defer([&]() { munmap(reserved, total_length); });
-    auto *ptr = static_cast<std::byte *>(reserved);
-    bool const first_map_ok = mmap(ptr + size_of_buffer - get_page_size(),
-                                   size_of_buffer, PROT_READ | PROT_WRITE,
-                                   MAP_SHARED | MAP_FIXED, fd, 0) != MAP_FAILED;
-    bool const second_map_ok = first_map_ok &&
-        mmap(ptr, size_of_buffer, PROT_READ | PROT_WRITE,
-             MAP_SHARED | MAP_FIXED, fd, 0) != MAP_FAILED;
-
-    if (second_map_ok) {
-      cleanup_reserved.release();
-      mapping.addr = reserved;
-      mapping.mirrored = true;
-    } else {
-      if (!allow_single_mapping) {
-        return mapping;
-      }
-      exec_defer(std::move(cleanup_reserved));
-    }
-  } else if (!allow_single_mapping) {
-    return mapping;
+  // Custom ring buffers still require mirroring after perf falls back.
+  if (!allow_single_mapping ||
+      !skip_perf_mirroring.load(std::memory_order_relaxed)) {
+    mapping.addr = map_mirrored_buffer(fd, size_of_buffer);
+    mapping.mirrored = mapping.addr != nullptr;
   }
 
   if (!mapping.addr && allow_single_mapping) {
@@ -169,8 +176,7 @@ PerfMmapRegion perfown_sz(int fd, size_t size_of_buffer,
     if (single == MAP_FAILED || !single) {
       return mapping;
     }
-    static std::atomic<bool> warned{false};
-    if (!warned.exchange(true)) {
+    if (!skip_perf_mirroring.exchange(true, std::memory_order_relaxed)) {
       LG_WRN("Unable to create mirrored perf ring buffer mapping, "
              "falling back to single mapping with wrap-around copies.");
     }
