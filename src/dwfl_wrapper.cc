@@ -58,12 +58,15 @@ DDRes DwflWrapper::attach(pid_t pid, const UniqueElf &ref_elf,
   return {};
 }
 
-DDProfMod *DwflWrapper::unsafe_get(FileInfoId_t file_info_id) {
-  auto it = _ddprof_mods.find(file_info_id);
-  if (it == _ddprof_mods.end()) {
-    return nullptr;
+DDProfMod *DwflWrapper::get(FileInfoId_t file_info_id, ProcessAddress_t pc) {
+  const auto [first, last] = _ddprof_mods.equal_range(file_info_id);
+  for (auto it = first; it != last; ++it) {
+    auto &mod = it->second;
+    if (mod._low_addr <= pc && pc < mod._high_addr) {
+      return &mod;
+    }
   }
-  return &it->second;
+  return nullptr;
 }
 
 DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
@@ -81,8 +84,8 @@ DDRes DwflWrapper::register_mod(ProcessAddress_t pc, const Dso &dso,
     *mod = nullptr;
     return res;
   }
-  *mod = &_ddprof_mods.insert_or_assign(fileInfoValue.get_id(), new_mod)
-              .first->second;
+  *mod =
+      &_ddprof_mods.emplace(fileInfoValue.get_id(), std::move(new_mod))->second;
   return res;
 }
 

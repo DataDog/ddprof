@@ -144,7 +144,7 @@ DDRes add_symbol(Dwfl_Frame *dwfl_frame, UnwindState *us) {
     }
     const FileInfoValue &file_info_value =
         us->dso_hdr.get_file_info_value(file_info_id);
-    ddprof_mod = us->_dwfl_wrapper->unsafe_get(file_info_id);
+    ddprof_mod = us->_dwfl_wrapper->get(file_info_id, pc);
     if (ddprof_mod) {
       break;
     }
